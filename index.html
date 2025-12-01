@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#f8fafc">
-    <title>资产管家 V16</title>
+    <title>资产管家 V16.1</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
@@ -25,12 +25,15 @@
         .text-transfer { color: #3b82f6; } .bg-transfer { background-color: #dbeafe; }
 
         /* 动画 */
-        .slide-enter-active, .slide-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); max-height: 800px; opacity: 1; }
+        .slide-enter-active, .slide-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); max-height: 1200px; opacity: 1; }
         .slide-enter-from, .slide-leave-to { max-height: 0; opacity: 0; }
         .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
         .fade-enter-from, .fade-leave-to { opacity: 0; }
 
         ::-webkit-scrollbar { width: 0px; }
+        /* 输入框样式微调 */
+        .input-ghost { background: transparent; outline: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+        .input-ghost:focus { border-bottom-color: #cbd5e1; }
     </style>
 </head>
 <body>
@@ -41,8 +44,8 @@
     <div v-if="!isUnlocked" class="fixed inset-0 z-50 bg-slate-100 flex flex-col items-center justify-center p-8 safe-area-top">
         <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-sm text-center border border-white">
             <div class="text-6xl mb-4">🦁</div>
-            <h1 class="text-2xl font-bold text-slate-800 mb-1">资产管家 V16</h1>
-            <p class="text-xs text-slate-400 mb-8 uppercase tracking-widest">Flagship Edition</p>
+            <h1 class="text-2xl font-bold text-slate-800 mb-1">资产管家 V16.1</h1>
+            <p class="text-xs text-slate-400 mb-8 uppercase tracking-widest">Fixed Edition</p>
 
             <div class="space-y-4">
                 <div class="bg-slate-50 rounded-2xl p-2 border border-slate-200">
@@ -103,18 +106,133 @@
                     <!-- 现金 -->
                     <div class="card"><div class="p-4 flex justify-between items-center bg-white active:bg-slate-50 transition" @click="ui.cashOpen=!ui.cashOpen"><div class="flex items-center gap-3"><span class="text-xl">👛</span><div><div class="font-bold text-sm">现金 & 活期</div><div class="text-[10px] text-slate-400">¥{{formatNumber(cashTotal)}}</div></div></div><span class="text-slate-300 text-xs">▼</span></div><div v-if="ui.cashOpen" class="bg-slate-50 p-4 space-y-3 border-t border-slate-100"><div class="flex justify-between items-center text-xs"><span class="font-bold text-slate-600">💵 现金钱包</span><input v-model.number="assets.cash" type="number" class="text-right font-bold bg-transparent outline-none w-24"></div><div class="flex justify-between items-center text-xs"><span class="font-bold text-slate-600">💳 储蓄卡</span><input v-model.number="assets.debit" type="number" class="text-right font-bold bg-transparent outline-none w-24"></div></div></div>
                     
-                    <!-- 信用卡 -->
-                    <div class="card"><div class="p-4 flex justify-between items-center bg-white active:bg-slate-50 transition" @click="ui.creditOpen=!ui.creditOpen"><div class="flex items-center gap-3"><span class="text-xl">💳</span><div><div class="font-bold text-sm">信用卡</div><div class="text-[10px] text-slate-400">负债: <span class="text-emerald-500">¥{{formatNumber(creditTotal)}}</span></div></div></div><span class="text-slate-300 text-xs">▼</span></div><div v-if="ui.creditOpen" class="bg-slate-50 p-3 space-y-3 border-t border-slate-100"><div v-for="(cc,i) in creditCards" :key="cc.id" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"><div class="flex justify-between mb-2"><input v-model="cc.name" class="font-bold text-sm bg-transparent outline-none w-1/2" placeholder="卡名"><button @click="removeCreditCard(i)" class="text-[10px] text-slate-300">✕</button></div><div class="flex justify-between text-xs items-center mb-2"><span class="text-slate-400">实时欠款</span><input v-model.number="cc.currentBalance" class="text-right font-bold text-emerald-500 bg-transparent outline-none w-24"></div><div class="bg-slate-50 p-2 rounded border border-dashed border-slate-200"><div class="flex justify-between text-[10px] text-slate-400 mb-1"><span>分期计划</span><button @click="addInstallment(cc)" class="text-blue-500 font-bold">+ 新增</button></div><div v-for="(inst,ii) in cc.installments" class="flex justify-between text-[10px] text-slate-600 mb-1"><span>{{inst.name}}</span><span>月供:{{Math.round(inst.monthlyAmount)}}</span><span @click="cc.installments.splice(ii,1)" class="text-red-300">✕</span></div></div></div><button @click="addCreditCard" class="w-full py-2 bg-white border border-dashed text-xs text-slate-400 rounded-xl font-bold">+ 添加卡片</button></div></div>
-                    
-                    <!-- 投资贷款 -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="card p-3 flex flex-col justify-center items-center active:scale-95 transition" @click="ui.investOpen=!ui.investOpen"><span class="text-2xl mb-1">📈</span><span class="text-[10px] font-bold text-slate-400">投资/定存</span><span class="text-sm font-bold text-amber-500">¥{{formatNumber(stockTotal+depositTotal)}}</span></div>
-                        <div class="card p-3 flex flex-col justify-center items-center active:scale-95 transition" @click="ui.loanOpen=!ui.loanOpen"><span class="text-2xl mb-1">🏠</span><span class="text-[10px] font-bold text-slate-400">贷款</span><span class="text-sm font-bold text-emerald-500">-¥{{formatNumber(loanTotal)}}</span></div>
+                    <!-- 信用卡 (重做：活期/分期) -->
+                    <div class="card">
+                        <div class="p-4 flex justify-between items-center bg-white active:bg-slate-50 transition" @click="ui.creditOpen=!ui.creditOpen">
+                            <div class="flex items-center gap-3">
+                                <span class="text-xl">💳</span>
+                                <div><div class="font-bold text-sm">信用卡</div><div class="text-[10px] text-slate-400">负债: <span class="text-emerald-500">¥{{formatNumber(creditTotal)}}</span></div></div>
+                            </div>
+                            <span class="text-slate-300 text-xs">▼</span>
+                        </div>
+                        <div v-if="ui.creditOpen" class="bg-slate-50 p-3 space-y-4 border-t border-slate-100">
+                            <div v-for="(cc,i) in creditCards" :key="cc.id" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative">
+                                <button @click="removeCreditCard(i)" class="absolute top-2 right-2 text-[10px] text-slate-300 hover:text-red-500">✕</button>
+                                
+                                <!-- 银行名称 -->
+                                <div class="mb-3 border-b border-dashed border-slate-100 pb-2">
+                                    <input v-model="cc.name" class="font-bold text-sm bg-transparent outline-none w-full" placeholder="银行名称 (如:招商银行)">
+                                </div>
+
+                                <!-- 活期部分 -->
+                                <div class="grid grid-cols-2 gap-2 mb-3">
+                                    <div class="bg-slate-50 p-2 rounded-lg">
+                                        <span class="text-[10px] text-slate-400 block mb-1">上月已出账</span>
+                                        <input v-model.number="cc.lastMonthBill" class="w-full text-right font-bold text-slate-700 bg-transparent outline-none text-xs" placeholder="0">
+                                    </div>
+                                    <div class="bg-slate-50 p-2 rounded-lg">
+                                        <span class="text-[10px] text-emerald-500 block mb-1">本月未出账</span>
+                                        <input v-model.number="cc.currentMonthBill" class="w-full text-right font-bold text-emerald-600 bg-transparent outline-none text-xs" placeholder="0">
+                                    </div>
+                                </div>
+
+                                <!-- 分期部分 -->
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase">分期明细</span>
+                                        <button @click="addInstallment(cc)" class="text-[10px] text-blue-500 font-bold">+ 添加事项</button>
+                                    </div>
+                                    <div v-if="cc.installments.length === 0" class="text-[10px] text-slate-300 text-center py-1 bg-slate-50 rounded">无分期</div>
+                                    <div v-else class="space-y-1">
+                                        <div v-for="(inst,ii) in cc.installments" :key="ii" class="flex justify-between items-center text-[10px] bg-slate-50 p-2 rounded">
+                                            <div class="flex flex-col">
+                                                <span class="font-bold text-slate-600">{{inst.name}}</span>
+                                                <span class="text-slate-400 scale-90 origin-left">总:{{inst.total}} | {{inst.months}}期</span>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="font-bold text-emerald-500">-{{Math.round(inst.monthlyAmount)}}/月</div>
+                                                <button @click="cc.installments.splice(ii,1)" class="text-red-300 text-[8px]">结束</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button @click="addCreditCard" class="w-full py-2 bg-white border border-dashed text-xs text-slate-400 rounded-xl font-bold hover:bg-slate-50">+ 添加新卡片</button>
+                        </div>
                     </div>
                     
-                    <!-- 隐藏详情 (简化) -->
-                    <div v-if="ui.investOpen" class="card p-3 bg-slate-50 space-y-2"><div v-for="(s,i) in stocks" class="flex justify-between text-xs bg-white p-2 rounded border"><span>{{s.name}}</span><span>¥{{formatNumber(s.shares*s.price)}}</span><button @click="stocks.splice(i,1)" class="text-red-300">✕</button></div><button @click="stocks.push({id:Date.now(),name:'新股票',shares:0,price:0})" class="text-[10px] w-full text-blue-500">+ 股票</button><div class="h-px bg-slate-200 my-2"></div><div v-for="(d,i) in deposits" class="flex justify-between text-xs bg-white p-2 rounded border"><span>{{d.name}}</span><span>¥{{formatNumber(d.amount)}}</span><button @click="deposits.splice(i,1)" class="text-red-300">✕</button></div><button @click="deposits.push({name:'新存单',amount:0})" class="text-[10px] w-full text-blue-500">+ 存单</button></div>
-                    <div v-if="ui.loanOpen" class="card p-3 bg-slate-50 space-y-2"><div v-for="(l,i) in loans" class="bg-white p-2 rounded border"><div class="flex justify-between text-xs mb-1"><input v-model="l.name" class="font-bold w-1/2 outline-none"><input v-model.number="l.total" class="text-right w-24 outline-none text-emerald-500"></div><div class="flex justify-between text-[10px] text-slate-400"><span>月供: <input v-model.number="l.monthlyPayment" class="w-10 bg-slate-50 text-center"></span><span @click="loans.splice(i,1)" class="text-red-300">删除</span></div></div><button @click="loans.push({id:Date.now(),name:'房贷',total:0,years:30,monthlyPayment:0})" class="text-[10px] w-full text-blue-500">+ 贷款</button></div>
+                    <!-- 投资 (股票 & 定存) -->
+                    <div class="card">
+                        <div class="p-4 flex justify-between items-center bg-white active:bg-slate-50 transition" @click="ui.investOpen=!ui.investOpen">
+                            <div class="flex items-center gap-3">
+                                <span class="text-xl">📈</span>
+                                <div><div class="font-bold text-sm">投资 & 定存</div><div class="text-[10px] text-slate-400">总额: <span class="text-amber-500">¥{{formatNumber(stockTotal+depositTotal)}}</span></div></div>
+                            </div>
+                            <span class="text-slate-300 text-xs">▼</span>
+                        </div>
+                        <div v-if="ui.investOpen" class="bg-slate-50 p-3 space-y-4 border-t border-slate-100">
+                            <!-- 股票区 -->
+                            <div>
+                                <h4 class="text-[10px] font-bold text-slate-400 uppercase mb-2">股票基金</h4>
+                                <div v-for="(s,i) in stocks" :key="i" class="bg-white p-3 rounded-xl border border-slate-200 mb-2 relative">
+                                    <button @click="stocks.splice(i,1)" class="absolute top-2 right-2 text-[10px] text-slate-300">✕</button>
+                                    <div class="flex gap-2 mb-2">
+                                        <input v-model="s.name" class="font-bold text-xs w-1/2 input-ghost" placeholder="股票名称">
+                                        <input v-model="s.code" class="text-xs text-slate-400 w-1/3 input-ghost uppercase" placeholder="代码">
+                                    </div>
+                                    <div class="flex gap-2 items-center text-[10px] text-slate-500">
+                                        <span class="bg-slate-100 px-1 rounded">持仓</span>
+                                        <input v-model.number="s.shares" type="number" class="w-16 input-ghost text-center">
+                                        <span class="bg-slate-100 px-1 rounded">单价</span>
+                                        <input v-model.number="s.price" type="number" class="w-16 input-ghost text-center text-amber-500 font-bold">
+                                        <span class="ml-auto font-mono">市值: {{formatNumber(s.shares*s.price)}}</span>
+                                    </div>
+                                </div>
+                                <button @click="stocks.push({id:Date.now(),name:'',code:'',shares:0,price:0})" class="w-full py-1.5 text-[10px] font-bold text-blue-500 bg-white border border-dashed rounded-lg">+ 添加股票</button>
+                            </div>
+                            <!-- 定存区 -->
+                            <div>
+                                <h4 class="text-[10px] font-bold text-slate-400 uppercase mb-2">定期存款</h4>
+                                <div v-for="(d,i) in deposits" :key="i" class="bg-white p-3 rounded-xl border border-slate-200 mb-2 relative">
+                                    <button @click="deposits.splice(i,1)" class="absolute top-2 right-2 text-[10px] text-slate-300">✕</button>
+                                    <div class="flex justify-between mb-2">
+                                        <input v-model="d.bank" class="font-bold text-xs w-1/2 input-ghost" placeholder="银行名称">
+                                        <input v-model.number="d.amount" type="number" class="text-right text-xs font-bold text-indigo-500 input-ghost w-1/3" placeholder="金额">
+                                    </div>
+                                    <div class="flex justify-between text-[10px] text-slate-400">
+                                        <div class="flex items-center gap-1">到期: <input type="date" v-model="d.date" class="bg-slate-50 rounded px-1"></div>
+                                        <div class="flex items-center gap-1">期数: <input v-model="d.term" class="w-8 text-center bg-slate-50 rounded" placeholder="3"> 年</div>
+                                    </div>
+                                </div>
+                                <button @click="deposits.push({name:'定存',bank:'',amount:0,date:'',term:''})" class="w-full py-1.5 text-[10px] font-bold text-blue-500 bg-white border border-dashed rounded-lg">+ 添加存单</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 贷款 (重做) -->
+                    <div class="card">
+                        <div class="p-4 flex justify-between items-center bg-white active:bg-slate-50 transition" @click="ui.loanOpen=!ui.loanOpen">
+                            <div class="flex items-center gap-3">
+                                <span class="text-xl">🏠</span>
+                                <div><div class="font-bold text-sm">房贷 / 贷款</div><div class="text-[10px] text-slate-400">余额: <span class="text-emerald-500">-¥{{formatNumber(loanTotal)}}</span></div></div>
+                            </div>
+                            <span class="text-slate-300 text-xs">▼</span>
+                        </div>
+                        <div v-if="ui.loanOpen" class="bg-slate-50 p-3 space-y-2 border-t border-slate-100">
+                            <div v-for="(l,i) in loans" :key="i" class="bg-white p-3 rounded-xl border border-slate-200 relative">
+                                <button @click="loans.splice(i,1)" class="absolute top-2 right-2 text-[10px] text-slate-300">✕</button>
+                                <div class="flex justify-between mb-2">
+                                    <input v-model="l.name" class="font-bold text-xs w-1/2 input-ghost" placeholder="贷款名称 (如: 房贷)">
+                                    <input v-model.number="l.total" type="number" class="text-right text-xs font-bold text-orange-500 input-ghost w-1/3" placeholder="总欠款">
+                                </div>
+                                <div class="flex justify-between text-[10px] text-slate-500 bg-slate-50 p-2 rounded">
+                                    <div class="flex items-center gap-1">年限: <input v-model.number="l.years" type="number" class="w-8 text-center bg-white border rounded" @input="calcLoanMonthly(l)"></div>
+                                    <div class="flex items-center gap-1">月供: <input v-model.number="l.monthlyPayment" type="number" class="w-12 text-center bg-white border rounded font-bold text-emerald-600"></div>
+                                </div>
+                            </div>
+                            <button @click="loans.push({id:Date.now(),name:'',total:0,years:30,monthlyPayment:0})" class="w-full py-1.5 text-[10px] font-bold text-blue-500 bg-white border border-dashed rounded-lg">+ 添加贷款</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 搜索与流水 -->
@@ -373,19 +491,29 @@
             cashTotal() { return (this.assets.cash||0) + (this.assets.debit||0); },
             depositTotal() { return this.deposits.reduce((s,i)=>s+(i.amount||0),0); },
             stockTotal() { return this.stocks.reduce((s,i)=>s+((i.shares||0)*(i.price||0)),0); },
-            creditTotal() { return this.creditCards.reduce((sum, c) => sum + (c.currentBalance||0) + (c.installments||[]).reduce((is,i)=>is+(i.total-(i.monthlyAmount*(i.paidMonths||0))),0), 0); },
+            
+            // 信用卡：总负债 = 活期 (上月+本月) + 分期剩余本金
+            creditTotal() { 
+                return this.creditCards.reduce((sum, c) => {
+                    const installmentDebt = (c.installments||[]).reduce((is,i) => is + (i.total - (i.monthlyAmount * (i.paidMonths||0))), 0);
+                    return sum + (c.lastMonthBill||0) + (c.currentMonthBill||0) + installmentDebt;
+                }, 0); 
+            },
+            
             loanTotal() { return this.loans.reduce((s,i)=>s+(i.total||0),0); },
             totalAssets() { return this.cashTotal + this.depositTotal + this.stockTotal; },
             totalLiabilities() { return this.creditTotal + this.loanTotal; },
             netWorth() { return this.totalAssets - this.totalLiabilities; },
             
-            // 报表用的本月统计
+            // 报表用的本月统计 (包含分期月供)
             monthlyStats() {
                 const cm = new Date().toISOString().slice(0,7);
                 const income = this.transactions.filter(t=>t.type==='income' && t.date.startsWith(cm)).reduce((s,t)=>s+t.amount,0);
                 let expense = this.transactions.filter(t=>t.type==='expense' && t.date.startsWith(cm)).reduce((s,t)=>s+t.amount,0);
-                this.loans.forEach(l => expense += (l.monthlyPayment||0));
+                // 自动计入信用卡分期月供 (简化逻辑：只要有分期就计入)
                 this.creditCards.forEach(c => (c.installments||[]).forEach(i => expense += (i.monthlyAmount||0)));
+                // 自动计入贷款月供
+                this.loans.forEach(l => expense += (l.monthlyPayment||0));
                 return { income, expense };
             },
             budgetProgress() { return (this.monthlyStats.expense / (this.settings.monthlyBudget || 1)) * 100; },
@@ -403,13 +531,13 @@
             }
         },
         mounted() {
-            if(localStorage.getItem('myWealth_V16')) this.hasLocalData = true;
+            if(localStorage.getItem('myWealth_V16_1')) this.hasLocalData = true;
         },
         methods: {
             unlock() {
                 if(!this.passwordInput) return;
                 this.masterKey = this.passwordInput;
-                const local = localStorage.getItem('myWealth_V16');
+                const local = localStorage.getItem('myWealth_V16_1');
                 if(local) { if(!this.decryptAndLoad(local)) alert("密码错误"); } else { this.isUnlocked = true; this.saveData(); }
             },
             decryptAndLoad(str) {
@@ -417,7 +545,6 @@
                     const bytes = CryptoJS.AES.decrypt(str, this.masterKey);
                     const data = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
                     Object.assign(this, data);
-                    // 兼容性处理
                     if(!this.settings) this.settings = { monthlyBudget: 5000, projects: ['装修','旅游','人情'] };
                     this.isUnlocked = true;
                     return true;
@@ -439,21 +566,15 @@
                 const {type, amount, accountId, fromId, toId} = tx;
                 
                 if (type === 'transfer') {
-                    // 转出账户减少
                     this.modifyBalance(fromId, -amount * f);
-                    // 转入账户增加
                     this.modifyBalance(toId, amount * f);
                 } else {
-                    // 收支逻辑
-                    // 现金/活期：收入加，支出减
                     if(['cash','debit'].includes(accountId)) {
                         this.modifyBalance(accountId, (type==='income'?amount:-amount)*f);
                     } else {
-                        // 信用卡/贷款：负债。收入(还款)=负债减，支出=负债加
-                        // 股票：收入(加仓)=值加，支出(减仓)=值减
                         let cc=this.creditCards.find(c=>c.id===accountId), st=this.stocks.find(s=>s.id===accountId), ln=this.loans.find(l=>l.id===accountId);
-                        if(cc) cc.currentBalance += (type==='expense'?amount:-amount)*f;
-                        else if(st) { /* 简化：股票暂不联动余额，仅记流水 */ }
+                        if(cc) cc.currentMonthBill += (type==='expense'?amount:-amount)*f; // 默认计入本月未出账
+                        else if(st) { /* 股票流水暂不自动改变持仓，需手动调整 */ }
                         else if(ln) ln.total += (type==='income'?-amount:amount)*f;
                     }
                 }
@@ -463,7 +584,7 @@
                 else if(id==='debit') this.assets.debit += delta;
                 else {
                     let cc=this.creditCards.find(c=>c.id===id);
-                    if(cc) cc.currentBalance -= delta; // 转入信用卡=还款=负债减
+                    if(cc) cc.currentMonthBill -= delta; // 转入信用卡=还款
                 }
             },
             confirmTx() {
@@ -493,23 +614,18 @@
 
                 const now = new Date();
                 let startStr = "";
-                // 计算日期范围
                 if(this.statsRange==='week') { const d=new Date(); d.setDate(d.getDate()-7); startStr=d.toISOString().slice(0,10); }
                 else if(this.statsRange==='month') { startStr=now.toISOString().slice(0,7); }
                 else { startStr=now.toISOString().slice(0,4); }
 
                 const txs = this.transactions.filter(t => t.date >= startStr && t.type!=='transfer');
-                
-                // 1. 总计
                 this.statsData.income = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
                 this.statsData.expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
 
-                // 2. 项目统计
                 const projMap = {};
                 txs.filter(t=>t.type==='expense' && t.project).forEach(t => projMap[t.project] = (projMap[t.project]||0)+t.amount);
                 this.statsData.projectStats = Object.entries(projMap).sort((a,b)=>b[1]-a[1]).map(([name, amount])=>({name, amount, percent: Math.round(amount/this.statsData.expense*100)}));
 
-                // 3. 分类图表
                 const catMap = {};
                 txs.filter(t=>t.type==='expense').forEach(t => catMap[t.category] = (catMap[t.category]||0)+t.amount);
                 const cats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -520,7 +636,6 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth:10 } } } }
                 });
 
-                // 4. 趋势图表 (简化为收支柱状)
                 const days = {};
                 txs.forEach(t => { const d=t.date.slice(5); if(!days[d]) days[d]={in:0,out:0}; if(t.type==='income') days[d].in+=t.amount; else days[d].out+=t.amount; });
                 const labels = Object.keys(days).sort();
@@ -542,9 +657,9 @@
                 const input = prompt("当前项目列表 (用逗号分隔):", this.settings.projects.join(','));
                 if(input !== null) { this.settings.projects = input.split(',').map(s=>s.trim()).filter(s=>s); this.saveData(); }
             },
-            addCreditCard() { this.creditCards.push({id:Date.now(), name:'', currentBalance:0, installments:[]}); },
+            addCreditCard() { this.creditCards.push({id:Date.now(), name:'', lastMonthBill:0, currentMonthBill:0, installments:[]}); },
             addInstallment(card) {
-                const name=prompt("商品名"), total=Number(prompt("总额")), months=Number(prompt("期数"));
+                const name=prompt("分期事项名称 (如: iPhone)"), total=Number(prompt("分期总金额")), months=Number(prompt("分期期数"));
                 if(name&&total&&months) card.installments.push({name, total, months, monthlyAmount:total/months, paidMonths:0});
             },
             removeCreditCard(idx) { if(confirm("删除此卡？")) this.creditCards.splice(idx,1); },
@@ -566,13 +681,13 @@
                 else this.history.find(h=>h.date===today).val = this.netWorth;
                 const data = { assets:this.assets, deposits:this.deposits, stocks:this.stocks, loans:this.loans, creditCards:this.creditCards, transactions:this.transactions, history:this.history, settings:this.settings };
                 const str = CryptoJS.AES.encrypt(JSON.stringify(data), this.masterKey).toString();
-                localStorage.setItem('myWealth_V16', str);
+                localStorage.setItem('myWealth_V16_1', str);
                 if(this.isUnlocked && this.currentTab==='stats') this.renderStats();
             },
             
             // Backup/File Logic
             exportToFile() {
-                const data = localStorage.getItem('myWealth_V16');
+                const data = localStorage.getItem('myWealth_V16_1');
                 const blob = new Blob([data], { type: 'text/plain' });
                 const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wealth_backup_${new Date().toISOString().slice(0,10)}.txt`; a.click();
             },
@@ -580,11 +695,9 @@
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
-                        // Validate format by trying to decrypt
                         const bytes = CryptoJS.AES.decrypt(e.target.result, this.masterKey);
                         JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-                        // Valid, save it
-                        localStorage.setItem('myWealth_V16', e.target.result);
+                        localStorage.setItem('myWealth_V16_1', e.target.result);
                         alert("恢复成功！刷新页面生效。");
                         location.reload();
                     } catch(err) { alert("文件无效或密码不匹配"); }
@@ -609,7 +722,7 @@
                 link.download = `账单_${new Date().toLocaleDateString()}.csv`;
                 link.click();
             },
-            resetApp() { if(confirm("⚠️ 确定重置？数据将永久丢失！")) { localStorage.removeItem('myWealth_V16'); location.reload(); } },
+            resetApp() { if(confirm("⚠️ 确定重置？数据将永久丢失！")) { localStorage.removeItem('myWealth_V16_1'); location.reload(); } },
             lockApp() { this.saveData(); this.isUnlocked = false; this.passwordInput = ''; },
             formatNumber(num) { return num ? num.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '0.00'; }
         }
