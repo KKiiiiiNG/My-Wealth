@@ -67,7 +67,7 @@
     <div v-if="!isUnlocked" class="fixed inset-0 z-50 bg-[#F5F7FA] flex flex-col items-center justify-center p-8 safe-pt">
         <div class="w-full max-w-sm text-center">
             <div class="w-24 h-24 bg-white rounded-[32px] shadow-xl flex items-center justify-center text-5xl mb-8 mx-auto">🦁</div>
-            <h1 class="text-3xl font-bold text-slate-800 mb-2 tracking-tight">资产管家 <span class="text-xs align-top bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-1">PRO</span></h1>
+            <h1 class="text-3xl font-bold text-slate-800 mb-2 tracking-tight">资产管家 <span class="text-xs align-top bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-1">FINAL</span></h1>
             <p class="text-sm text-slate-400 mb-12 font-medium tracking-wide">本地私密 · 投资增强</p>
 
             <div class="space-y-6">
@@ -324,7 +324,7 @@
             <div class="px-6 py-4 flex justify-between items-center bg-transparent">
                 <button @click="showTxModal=false" class="text-slate-400 font-bold text-sm bg-white px-4 py-2 rounded-full shadow-sm active:scale-95 transition">取消</button>
                 <div class="flex bg-white p-1 rounded-full shadow-sm">
-                    <button v-for="t in ['expense','income','transfer','adjust']" :key="t" @click="newTx.type=t" 
+                    <button v-for="t in ['expense','income','transfer','adjust']" :key="t" @click="setTxType(t)" 
                         :class="newTx.type===t ? 'bg-slate-900 text-white' : 'text-slate-400'"
                         class="px-3 py-2 rounded-full text-xs font-bold transition capitalize">
                         {{t==='expense'?'支出':(t==='income'?'收入':(t==='transfer'?'转账':'调价'))}}
@@ -386,7 +386,7 @@
                 </div>
 
                 <!-- 3. 分类 (收支模式) -->
-                <div v-if="['expense','income'].includes(newTx.type)">
+                <div v-if="['expense','income', 'adjust'].includes(newTx.type)">
                     <p class="text-xs font-bold text-slate-400 uppercase mb-3 ml-2">Category 分类</p>
                     <div class="grid grid-cols-5 gap-4">
                         <div v-for="cat in currentCategories" :key="cat.name" @click="newTx.category=cat.name; newTx.icon=cat.icon" class="flex flex-col items-center gap-2 transition active:scale-90 cursor-pointer" :class="{'opacity-100': newTx.category===cat.name, 'opacity-40 grayscale': newTx.category!==cat.name}">
@@ -400,7 +400,13 @@
                 <div class="space-y-4">
                     <div class="flex gap-3">
                         <div class="w-1/2 bg-white p-3 rounded-2xl shadow-sm"><label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Date</label><input type="date" v-model="newTx.date" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none"></div>
-                        <div class="w-1/2 bg-white p-3 rounded-2xl shadow-sm"><label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Project</label><select v-model="newTx.project" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none"><option value="">无项目</option><option v-for="p in settings.projects" :value="p">{{p}}</option></select></div>
+                        <div class="w-1/2 bg-white p-3 rounded-2xl shadow-sm flex items-center justify-between px-3">
+                             <div class="w-full">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Project</label>
+                                <select v-model="newTx.project" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none"><option value="">无项目</option><option v-for="p in settings.projects" :value="p">{{p}}</option></select>
+                             </div>
+                             <button @click="addProject" class="text-blue-500 font-bold text-lg ml-1 leading-none" title="添加项目">+</button>
+                        </div>
                     </div>
                     <div class="bg-white p-4 rounded-2xl shadow-sm"><input type="text" v-model="newTx.desc" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none placeholder:text-slate-300" placeholder="添加备注 (可选)..."></div>
                 </div>
@@ -426,7 +432,7 @@
                 assets: { cash: 0, debit: 0 },
                 deposits: [], stocks: [], loans: [], creditCards: [], 
                 transactions: [], history: [], 
-                settings: { monthlyBudget: 5000, projects: ['装修','旅游','人情','宠物'] },
+                settings: { monthlyBudget: 5000, projects: ['装修','旅游','人情','宠物','汽车','医疗','教育','大件'] },
                 
                 newTx: { type: 'expense', amount: '', category: '餐饮', icon: '🍔', desc: '', accountId: 'cash', fromId:'cash', toId:'debit', date: new Date().toISOString().slice(0,10), project: '', stockPrice:'', stockShares:'' },
                 editingTx: null,
@@ -436,7 +442,8 @@
                     expense: [
                         {name:'餐饮',icon:'🍔'},{name:'购物',icon:'🛍️'},{name:'交通',icon:'🚗'},{name:'住房',icon:'🏠'},
                         {name:'娱乐',icon:'🎮'},{name:'医疗',icon:'💊'},{name:'教育',icon:'🎓'},{name:'宠物',icon:'🐾'},
-                        {name:'美妆',icon:'💄'},{name:'运动',icon:'🏃'},{name:'社交',icon:'🥂'},{name:'旅游',icon:'✈️'}
+                        {name:'美妆',icon:'💄'},{name:'运动',icon:'🏃'},{name:'社交',icon:'🥂'},{name:'旅游',icon:'✈️'},
+                        {name:'数码',icon:'📱'},{name:'通讯',icon:'📞'},{name:'投资',icon:'📉'},{name:'其他',icon:'📝'}
                     ],
                     income: [
                         {name:'工资',icon:'💰'},{name:'理财',icon:'📈'},{name:'兼职',icon:'💼'},{name:'礼金',icon:'🧧'},
@@ -470,7 +477,6 @@
             currentCategories() { return this.newTx.type === 'expense' ? this.categories.expense : this.categories.income; },
             
             isStockTransaction() {
-                // 判断当前交易是否涉及股票账户 (Transfer To/From Stock)
                 if(this.newTx.type === 'transfer') return this.stocks.find(s=>s.id===this.newTx.fromId) || this.stocks.find(s=>s.id===this.newTx.toId);
                 return false; 
             },
@@ -506,7 +512,17 @@
                 } catch(e) { return false; }
             },
             
-            // === 记账逻辑核心 (Transaction Core) ===
+            // === 核心逻辑 ===
+            setTxType(t) {
+                this.newTx.type = t;
+                if (t === 'adjust') {
+                    this.newTx.category = '理财';
+                    this.newTx.icon = '📈';
+                } else if (t === 'expense' && this.newTx.category === '理财') {
+                    this.newTx.category = '餐饮'; // reset to default expense if switching back
+                    this.newTx.icon = '🍔';
+                }
+            },
             openTxModal(tx) { 
                 this.editingTx = tx;
                 this.newTx = tx ? JSON.parse(JSON.stringify(tx)) : { 
@@ -520,27 +536,19 @@
                 const f = revert ? -1 : 1;
                 const {type, amount, accountId, fromId, toId, stockShares, stockPrice} = tx;
                 
-                // 1. 市值调整 (Adjust) - 仅更新股票价格，不影响现金
                 if (type === 'adjust') {
                     const st = this.stocks.find(s=>s.id === accountId);
-                    if (st) st.price = amount; // 将 Amount 视为新单价
+                    if (st) st.price = amount; 
                     return; 
                 }
-
-                // 2. 转账 (Transfer) - 含买卖股票逻辑
                 if (type === 'transfer') {
                     this.modifyBalance(fromId, -amount * f);
                     this.modifyBalance(toId, amount * f);
-                    
-                    // 股票特殊处理
                     const toStock = this.stocks.find(s=>s.id === toId);
                     const fromStock = this.stocks.find(s=>s.id === fromId);
-                    
-                    if (toStock && stockShares) toStock.shares += stockShares * f; // 买入
-                    if (fromStock && stockShares) fromStock.shares -= stockShares * f; // 卖出
-                } 
-                // 3. 普通收支
-                else {
+                    if (toStock && stockShares) toStock.shares += stockShares * f; 
+                    if (fromStock && stockShares) fromStock.shares -= stockShares * f;
+                } else {
                     if(['cash','debit'].includes(accountId)) {
                         this.modifyBalance(accountId, (type==='income'?amount:-amount)*f);
                     } else {
@@ -574,6 +582,14 @@
                 this.showTxModal = false;
                 this.saveData();
             },
+            addProject() {
+                const p = prompt("请输入新项目名称:");
+                if(p && !this.settings.projects.includes(p)) {
+                    this.settings.projects.push(p);
+                    this.newTx.project = p;
+                    this.saveData();
+                }
+            },
 
             // === 报表渲染 ===
             renderStats() {
@@ -585,25 +601,6 @@
                 if(this.catChart) this.catChart.destroy();
                 if(this.investChart) this.investChart.destroy();
 
-                // 1. 投资趋势图 (Invest Chart)
-                // 从历史记录中提取 stockVal
-                const investLabels = this.history.slice(-30).map(h => h.date.slice(5));
-                const investData = this.history.slice(-30).map(h => h.stockVal || 0);
-                
-                this.investChart = new Chart(ctxInvest, {
-                    type: 'line',
-                    data: {
-                        labels: investLabels,
-                        datasets: [{ 
-                            label: '市值', data: investData, 
-                            borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', 
-                            borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-                });
-
-                // ... (其余图表逻辑保持不变) ...
                 const now = new Date();
                 let startStr = "";
                 if(this.statsRange==='week') { const d=new Date(); d.setDate(d.getDate()-7); startStr=d.toISOString().slice(0,10); }
@@ -636,9 +633,16 @@
                     data: { labels, datasets: [ { label:'支', data: labels.map(d=>days[d].out), backgroundColor:'#10b981', borderRadius:3 }, { label:'收', data: labels.map(d=>days[d].in), backgroundColor:'#ef4444', borderRadius:3 } ] },
                     options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{display:false}} }
                 });
+                
+                const investLabels = this.history.slice(-30).map(h => h.date.slice(5));
+                const investData = this.history.slice(-30).map(h => h.stockVal || 0);
+                this.investChart = new Chart(ctxInvest, {
+                    type: 'line',
+                    data: { labels: investLabels, datasets: [{ label: '市值', data: investData, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+                });
             },
 
-            // 通用
             manageProjects() {
                 const input = prompt("当前项目列表 (用逗号分隔):", this.settings.projects.join(','));
                 if(input !== null) { this.settings.projects = input.split(',').map(s=>s.trim()).filter(s=>s); this.saveData(); }
@@ -664,9 +668,7 @@
             
             saveData() {
                 const today = new Date().toLocaleDateString();
-                // 记录 investment value 到 history
                 const currentStockVal = this.stockTotal;
-                
                 if(!this.history.find(h=>h.date===today)) { 
                     this.history.push({date:today, val:this.netWorth, stockVal: currentStockVal}); 
                     if(this.history.length>30) this.history.shift(); 
