@@ -1,727 +1,472 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="ios-theme">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#f8fafc">
-    <title>资产管家</title>
-
+    <meta name="format-detection" content="telephone=no">
+    <title>iCost 复刻版</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/dexie@3/dist/dexie.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+    
     <style>
-        /* iOS 原生质感 */
+        /* iOS 风格优化 */
         body { 
-            background-color: #F5F7FA; 
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif; 
-            color: #1e293b; 
-            -webkit-tap-highlight-color: transparent; 
-            -webkit-font-smoothing: antialiased;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none; /* 禁止橡皮筋效果 */
+            background-color: #f2f2f7; /* iOS 系统背景色 */
         }
-        
-        /* 适配灵动岛与底部横条 */
-        .safe-pt { padding-top: max(20px, env(safe-area-inset-top)); }
-        .safe-pb { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
-        
-        /* 玻璃拟态卡片 */
-        .card-ios { 
-            background: rgba(255, 255, 255, 0.85); 
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 24px; 
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04); 
-            border: 1px solid rgba(255, 255, 255, 0.6); 
-            overflow: hidden; 
-            transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-        }
-        .card-ios:active { transform: scale(0.985); }
-        
-        /* 语义色 */
-        .text-income { color: #ef4444; } .bg-income { background-color: #fee2e2; }
-        .text-expense { color: #10b981; } .bg-expense { background-color: #d1fae5; }
-        .text-transfer { color: #3b82f6; } .bg-transfer { background-color: #dbeafe; }
-        .text-adjust { color: #f59e0b; } .bg-adjust { background-color: #fef3c7; }
-
-        /* 动画 */
-        .slide-up-enter-active, .slide-up-leave-active { transition: all 0.4s cubic-bezier(0.32, 0.72, 0, 1); transform: translateY(0); }
-        .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
-        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
-        .fade-enter-from, .fade-leave-to { opacity: 0; }
-
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
-        .input-clean { background: transparent; outline: none; width: 100%; }
-        
-        /* 底部导航凸起效果 */
-        .nav-fab-shadow { box-shadow: 0 8px 30px rgba(15, 23, 42, 0.25); }
+        /* 隐藏滚动条但保持滚动 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* 适配刘海屏和底部横条 */
+        .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
+        .safe-pt { padding-top: env(safe-area-inset-top); }
     </style>
 </head>
 <body>
 
-<div id="app" class="h-screen w-full flex flex-col bg-[#F5F7FA] relative overflow-hidden">
-
-    <!-- ================= 1. 登录 ================= -->
-    <div v-if="!isUnlocked" class="fixed inset-0 z-50 bg-[#F5F7FA] flex flex-col items-center justify-center p-8 safe-pt">
-        <div class="w-full max-w-sm text-center">
-            <div class="w-24 h-24 bg-white rounded-[32px] shadow-xl flex items-center justify-center text-5xl mb-8 mx-auto">🦁</div>
-            <h1 class="text-3xl font-bold text-slate-800 mb-2 tracking-tight">资产管家 <span class="text-xs align-top bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-1">FINAL</span></h1>
-            <p class="text-sm text-slate-400 mb-12 font-medium tracking-wide">本地私密 · 投资增强</p>
-
-            <div class="space-y-6">
-                <div class="bg-white rounded-3xl p-2 pl-6 shadow-sm border border-slate-100 flex items-center transition focus-within:ring-4 ring-blue-50">
-                    <span class="text-xl">🔑</span>
-                    <input type="password" v-model="passwordInput" placeholder="输入主密码" class="w-full bg-transparent p-4 text-lg font-bold text-slate-700 outline-none placeholder:text-slate-300">
+<div id="app" class="h-screen flex flex-col overflow-hidden">
+    
+    <main class="flex-1 overflow-y-auto no-scrollbar safe-pt">
+        
+        <div v-if="currentTab === 'timeline'" class="p-4 space-y-4">
+            <div class="bg-white rounded-2xl p-5 shadow-sm">
+                <div class="text-sm text-gray-500">本月结余</div>
+                <div class="text-3xl font-bold mt-1">{{ formatCurrency(monthlyBalance) }}</div>
+                <div class="flex mt-4 text-sm">
+                    <div class="flex-1">
+                        <div class="text-gray-500">收入</div>
+                        <div class="font-semibold text-green-600 text-lg">{{ formatCurrency(monthlyIncome) }}</div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-gray-500">支出</div>
+                        <div class="font-semibold text-red-600 text-lg">{{ formatCurrency(monthlyExpense) }}</div>
+                    </div>
                 </div>
-                <button @click="unlock" class="w-full py-4 rounded-3xl font-bold text-white shadow-xl shadow-slate-200 text-lg bg-slate-900 active:scale-95 transition-all duration-300">
-                    {{ hasLocalData ? '验证解锁' : '设置新密码' }}
+            </div>
+
+            <div class="space-y-2 pb-20">
+                <div v-for="tx in recentTransactions" :key="tx.id" class="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm active:bg-gray-50 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl">
+                            {{ getCategoryIcon(tx.category) }}
+                        </div>
+                        <div>
+                            <div class="font-semibold">{{ tx.category }}</div>
+                            <div class="text-xs text-gray-400 mt-0.5">
+                                {{ formatDate(tx.date) }} · 
+                                <span v-if="tx.type === 'transfer'">
+                                    {{ getAccountName(tx.sourceAccountId) }} ➔ {{ getAccountName(tx.targetAccountId) }}
+                                </span>
+                                <span v-else>
+                                    {{ getAccountName(tx.type === 'expense' ? tx.sourceAccountId : tx.targetAccountId) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div :class="getAmountColor(tx.type)" class="font-bold text-lg">
+                        {{ tx.type === 'expense' ? '-' : (tx.type === 'income' ? '+' : '') }}{{ formatCurrency(tx.amount) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentTab === 'assets'" class="p-4 space-y-4 pb-20">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+                <div class="opacity-80 text-sm">净资产总额</div>
+                <div class="text-3xl font-bold mt-1">{{ formatCurrency(netWorth) }}</div>
+            </div>
+
+            <div>
+                <div class="text-gray-500 text-sm ml-2 mb-2 font-bold flex justify-between items-center">
+                    资金账户 (Cash & Banks)
+                    <button @click="addNewAccount('asset')" class="text-blue-500 text-xs">添加</button>
+                </div>
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <div v-for="acc in assetAccounts" :key="acc.id" class="p-4 border-b last:border-b-0 flex justify-between active:bg-gray-50">
+                        <div>{{ acc.name }}</div>
+                        <div class="font-semibold">{{ formatCurrency(acc.balance) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="text-gray-500 text-sm ml-2 mb-2 font-bold flex justify-between items-center">
+                    信用账户 (Credit & Loans)
+                    <button @click="addNewAccount('liability')" class="text-blue-500 text-xs">添加</button>
+                </div>
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <div v-for="acc in liabilityAccounts" :key="acc.id" class="p-4 border-b last:border-b-0 flex justify-between active:bg-gray-50">
+                        <div>{{ acc.name }}</div>
+                        <div class="font-semibold text-red-500">{{ formatCurrency(acc.balance) }}</div>
+                    </div>
+                </div>
+            </div>
+            
+             <div>
+                <div class="text-gray-500 text-sm ml-2 mb-2 font-bold flex justify-between items-center">
+                    投资账户 (Investments)
+                    <button @click="addNewAccount('investment')" class="text-blue-500 text-xs">添加</button>
+                </div>
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <div v-for="acc in investmentAccounts" :key="acc.id" class="p-4 border-b last:border-b-0 flex justify-between items-center active:bg-gray-50">
+                        <div>
+                            <div>{{ acc.name }}</div>
+                            <div class="text-xs text-gray-400" v-if="acc.quantity > 0">持有: {{ acc.quantity }} 份/股</div>
+                        </div>
+                        <div class="font-semibold text-blue-600">{{ formatCurrency(acc.balance) }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <nav class="bg-white border-t safe-pb flex justify-around items-center text-gray-400 text-[10px] font-medium h-16 z-10">
+        <button @click="currentTab = 'timeline'" :class="{'text-blue-600': currentTab === 'timeline'}" class="flex-1 flex flex-col items-center justify-center h-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            明细
+        </button>
+        <button @click="currentTab = 'assets'" :class="{'text-blue-600': currentTab === 'assets'}" class="flex-1 flex flex-col items-center justify-center h-full">
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+            资产
+        </button>
+        
+        <div class="flex-1 flex justify-center items-center h-full relative top-[-12px]">
+            <button @click="openRecordModal" class="bg-blue-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg active:scale-95 transition-transform border-4 border-[#f2f2f7]">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+            </button>
+        </div>
+
+        <button class="flex-1 flex flex-col items-center justify-center h-full">
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-3v3m2 2h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            图表
+        </button>
+        <button class="flex-1 flex flex-col items-center justify-center h-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            设置
+        </button>
+    </nav>
+
+    <div v-if="showRecordModal" class="fixed inset-0 z-20 bg-black/40 flex flex-col justify-end backdrop-blur-sm transition-opacity">
+        <div class="flex-1" @click="showRecordModal = false"></div>
+        
+        <div class="bg-white rounded-t-3xl shadow-2xl overflow-hidden safe-pb">
+            <div class="flex justify-center pt-3 pb-1"><div class="w-10 h-1 bg-gray-200 rounded-full"></div></div>
+            
+            <div class="flex p-2 px-4 gap-2">
+                <button v-for="type in ['expense', 'income', 'transfer']" 
+                    @click="recordForm.type = type"
+                    :class="recordForm.type === type ? (type==='expense'?'bg-red-100 text-red-600':(type==='income'?'bg-green-100 text-green-600':'bg-blue-100 text-blue-600')) : 'bg-gray-100 text-gray-500'"
+                    class="flex-1 py-2.5 text-center font-bold rounded-xl transition-colors">
+                    {{ type === 'expense' ? '支出' : (type === 'income' ? '收入' : '转账') }}
                 </button>
             </div>
-            
-            <div class="mt-12">
-                <button @click="showImport=!showImport" class="text-xs font-bold text-blue-500 bg-blue-50 px-4 py-2 rounded-full hover:bg-blue-100 transition">📂 恢复备份</button>
-                <transition name="fade">
-                    <div v-if="showImport" class="mt-4 bg-white p-4 rounded-3xl shadow-lg border border-slate-100">
-                        <textarea v-model="importString" class="w-full h-24 text-xs bg-slate-50 p-3 rounded-2xl resize-none outline-none text-slate-600 mb-3" placeholder="粘贴加密数据串..."></textarea>
-                        <button @click="importData" class="w-full py-3 bg-slate-900 text-white text-xs rounded-2xl font-bold">确认恢复</button>
+
+            <div class="px-4 py-2 flex flex-col gap-3">
+                 <div v-if="recordForm.type === 'transfer'" class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div class="flex-1">
+                        <div class="text-xs text-gray-400 mb-1">从 (流出)</div>
+                        <select v-model="recordForm.sourceAccountId" class="w-full bg-transparent font-semibold">
+                            <option v-for="acc in assetAccounts" :value="acc.id">{{ acc.name }} ({{formatCurrency(acc.balance)}})</option>
+                        </select>
                     </div>
-                </transition>
+                    <div class="text-gray-400">→</div>
+                    <div class="flex-1">
+                        <div class="text-xs text-gray-400 mb-1">到 (流入/还款)</div>
+                        <select v-model="recordForm.targetAccountId" class="w-full bg-transparent font-semibold">
+                            <option v-for="acc in allAccounts" :value="acc.id" :key="acc.id" :disabled="acc.id === recordForm.sourceAccountId">
+                                {{ acc.name }} ({{formatCurrency(acc.balance)}})
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                
+                 <div v-else class="flex gap-3">
+                     <div class="bg-gray-100 rounded-xl p-3 flex-1 flex items-center gap-2">
+                        <span class="text-gray-500">账户:</span>
+                        <select v-model="recordForm.sourceAccountId" class="bg-transparent font-semibold flex-1 outline-none">
+                            <option v-for="acc in availableAccountsForType" :value="acc.id">{{ acc.name }}</option>
+                        </select>
+                    </div>
+                    <div class="bg-gray-100 rounded-xl p-3 flex-1 flex items-center gap-2">
+                         <span class="text-gray-500">分类:</span>
+                         <input v-model="recordForm.category" type="text" class="bg-transparent font-semibold flex-1 outline-none" placeholder="例如: 午餐">
+                    </div>
+                </div>
+                
+                 <div v-if="isInvestmentTransaction" class="bg-blue-50 p-3 rounded-xl flex items-center gap-2 text-blue-800 border border-blue-100">
+                    <span>份额/股数变更:</span>
+                    <input v-model="recordForm.quantityChange" type="number" step="0.01" placeholder="例如: +100 或 -100" class="bg-transparent font-semibold flex-1 outline-none">
+                </div>
+            </div>
+
+            <div class="px-6 py-4 text-right border-t border-b flex items-end justify-between bg-gray-50">
+                <span class="text-2xl font-bold text-gray-400">¥</span>
+                <span class="text-5xl font-bold tracking-tight" :class="{'text-red-500': recordForm.type === 'expense', 'text-green-500': recordForm.type === 'income', 'text-blue-500': recordForm.type === 'transfer'}">
+                    {{ keypadValue || '0.00' }}
+                </span>
+            </div>
+
+            <div class="grid grid-cols-4 bg-white p-1 safe-pb">
+                <button v-for="key in ['7','8','9','Del','4','5','6','+','1','2','3','-','.','0','OK']" 
+                    :key="key"
+                    @click="handleKeypadPress(key)"
+                    :class="{'row-span-2 bg-blue-600 text-white text-xl': key === 'OK', 'text-blue-500 bg-blue-50': ['+','-'].includes(key), 'bg-white': !['OK','+','-'].includes(key)}"
+                    class="h-14 m-1 rounded-xl font-bold text-2xl shadow-sm border border-gray-100 flex items-center justify-center active:bg-gray-100 transition-colors">
+                    {{ key === 'Del' ? '←' : key }}
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- ================= 2. 主程序 ================= -->
-    <div v-else class="flex-1 flex flex-col h-full overflow-hidden">
-        
-        <!-- 顶部区域 -->
-        <header class="px-6 pt-16 pb-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/60 rounded-b-[40px] shadow-sm">
-            <div class="flex justify-between items-center mb-1">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest pl-1">Total Assets</span>
-                <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-medium">{{ currentDate }}</span>
-            </div>
-            <h1 class="text-[42px] leading-tight font-black text-slate-800 tracking-tight mb-5">
-                <span class="text-2xl text-slate-400 font-medium align-top mr-1">¥</span>{{ formatNumber(netWorth) }}
-            </h1>
-            
-            <!-- 预算条 -->
-            <div class="bg-slate-100/80 rounded-2xl p-1.5 flex items-center gap-3 pr-4">
-                <div class="h-10 bg-white rounded-xl flex-1 flex items-center px-3 relative overflow-hidden shadow-sm">
-                    <div class="absolute left-0 top-0 bottom-0 bg-blue-500/10 transition-all duration-700" :style="{width: Math.min(budgetProgress, 100) + '%'}"></div>
-                    <div class="relative z-10 flex justify-between w-full text-xs font-bold text-slate-600">
-                        <span>本月预算</span>
-                        <span>{{Math.round(budgetProgress)}}%</span>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <div class="text-[10px] text-slate-400 font-bold uppercase">Left</div>
-                    <div class="text-xs font-bold text-slate-700">¥{{formatNumber(settings.monthlyBudget - monthlyStats.expense)}}</div>
-                </div>
-            </div>
-        </header>
-
-        <!-- 内容区域 -->
-        <main class="flex-1 overflow-y-auto p-5 space-y-6 pb-36">
-            
-            <!-- >>>>>> Home Tab <<<<<< -->
-            <div v-if="currentTab === 'home'" class="space-y-5 animate-fade-in">
-                
-                <!-- 资产模块 -->
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center px-2">
-                        <h3 class="font-bold text-slate-800 text-lg">账户概览</h3>
-                        <button @click="toggleAll" class="text-[11px] font-bold text-slate-500 bg-white px-3 py-1.5 rounded-full shadow-sm active:scale-95 transition">{{ui.cashOpen?'折叠':'展开'}}</button>
-                    </div>
-
-                    <!-- 现金 -->
-                    <div class="card-ios">
-                        <div class="p-5 flex justify-between items-center" @click="ui.cashOpen=!ui.cashOpen">
-                            <div class="flex items-center gap-4"><div class="w-12 h-12 rounded-[18px] bg-blue-50 text-blue-600 flex items-center justify-center text-2xl">👛</div><div><div class="font-bold text-base text-slate-700">现金 & 活期</div><div class="text-xs font-medium text-slate-400 mt-0.5">¥{{formatNumber(cashTotal)}}</div></div></div>
-                            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 text-xs transition-transform duration-300" :class="ui.cashOpen?'rotate-180':''">▼</div>
-                        </div>
-                        <div v-show="ui.cashOpen" class="bg-slate-50/50 p-4 pt-0 space-y-3 pb-5">
-                            <div class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100"><span class="text-xs font-bold text-slate-500 pl-1">💵 现金钱包</span><input v-model.number="assets.cash" type="number" class="text-right font-bold text-slate-800 bg-transparent outline-none w-28 text-sm" placeholder="0"></div>
-                            <div class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100"><span class="text-xs font-bold text-slate-500 pl-1">💳 储蓄卡</span><input v-model.number="assets.debit" type="number" class="text-right font-bold text-slate-800 bg-transparent outline-none w-28 text-sm" placeholder="0"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- 信用卡 -->
-                    <div class="card-ios">
-                        <div class="p-5 flex justify-between items-center" @click="ui.creditOpen=!ui.creditOpen">
-                            <div class="flex items-center gap-4"><div class="w-12 h-12 rounded-[18px] bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl">💳</div><div><div class="font-bold text-base text-slate-700">信用卡</div><div class="text-xs font-medium text-slate-400 mt-0.5">负债: <span class="text-emerald-500">¥{{formatNumber(creditTotal)}}</span></div></div></div>
-                            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 text-xs transition-transform duration-300" :class="ui.creditOpen?'rotate-180':''">▼</div>
-                        </div>
-                        <div v-show="ui.creditOpen" class="bg-slate-50/50 p-4 pt-0 pb-5 space-y-3">
-                            <div v-for="(cc,i) in creditCards" :key="cc.id" class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 relative">
-                                <button @click="removeCreditCard(i)" class="absolute top-3 right-3 text-slate-300 hover:text-red-500 text-lg">×</button>
-                                <input v-model="cc.name" class="font-bold text-base text-slate-800 bg-transparent outline-none w-3/4 mb-3" placeholder="银行名称">
-                                <div class="grid grid-cols-2 gap-2 mb-3">
-                                    <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[10px] text-slate-400 font-bold mb-1">上月已出</div><input v-model.number="cc.lastMonthBill" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none" placeholder="0"></div>
-                                    <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[10px] text-emerald-500 font-bold mb-1">本月未出</div><input v-model.number="cc.currentMonthBill" class="w-full bg-transparent font-bold text-emerald-600 text-sm outline-none" placeholder="0"></div>
-                                </div>
-                                <div class="border-t border-dashed border-slate-100 pt-2">
-                                    <div class="flex justify-between items-center mb-2"><span class="text-[10px] font-bold text-slate-400 uppercase">分期计划</span><button @click="addInstallment(cc)" class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">新增</button></div>
-                                    <div v-if="cc.installments.length===0" class="text-center text-[10px] text-slate-300 py-1">无分期</div>
-                                    <div v-else v-for="(inst,ii) in cc.installments" :key="ii" class="flex justify-between items-center text-xs py-1"><span class="font-medium text-slate-600">{{inst.name}}</span><div class="flex items-center gap-2"><span class="text-slate-400 scale-90">剩{{formatNumber(inst.total - (inst.monthlyAmount * inst.paidMonths))}}</span><span class="font-bold text-emerald-500">-{{Math.round(inst.monthlyAmount)}}</span><button @click="cc.installments.splice(ii,1)" class="text-red-300 ml-1">×</button></div></div>
-                                </div>
-                            </div>
-                            <button @click="addCreditCard" class="w-full py-3 bg-white border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold rounded-2xl hover:border-blue-300 transition">+ 添加新卡片</button>
-                        </div>
-                    </div>
-                    
-                    <!-- 投资 & 贷款 -->
-                    <div class="card-ios">
-                        <div class="p-5 flex justify-between items-center" @click="ui.investOpen=!ui.investOpen">
-                            <div class="flex items-center gap-4"><div class="w-12 h-12 rounded-[18px] bg-amber-50 text-amber-500 flex items-center justify-center text-2xl">📈</div><div><div class="font-bold text-base text-slate-700">投资 & 贷款</div><div class="text-xs font-medium text-slate-400 mt-0.5">净值: <span class="text-slate-600">¥{{formatNumber(stockTotal+depositTotal-loanTotal)}}</span></div></div></div>
-                            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 text-xs transition-transform duration-300" :class="ui.investOpen?'rotate-180':''">▼</div>
-                        </div>
-                        <div v-show="ui.investOpen" class="bg-slate-50/50 p-4 pt-0 pb-5 space-y-4">
-                            <!-- 股票 -->
-                            <div class="bg-white p-4 rounded-[20px] shadow-sm">
-                                <h4 class="text-[10px] font-bold text-slate-400 uppercase mb-3 flex justify-between">股票基金 <span class="text-amber-500">¥{{formatNumber(stockTotal)}}</span></h4>
-                                <div v-for="(s,i) in stocks" :key="i" class="flex items-center justify-between mb-3 text-sm pb-2 border-b border-slate-50 last:border-0 last:pb-0">
-                                    <div class="flex flex-col"><input v-model="s.name" class="font-bold w-24 input-clean" placeholder="名称"><input v-model="s.code" class="text-[10px] text-slate-400 input-clean uppercase" placeholder="代码"></div>
-                                    <div class="flex flex-col items-end gap-1"><div class="flex gap-1"><input v-model.number="s.shares" class="text-right w-12 bg-slate-50 rounded px-1 text-xs" placeholder="股"><span class="text-xs text-slate-300">×</span><input v-model.number="s.price" class="text-right w-12 bg-slate-50 rounded px-1 text-xs font-bold text-amber-500" placeholder="价"></div><div class="text-[10px] text-slate-400">¥{{formatNumber(s.shares*s.price)}}</div></div>
-                                    <button @click="stocks.splice(i,1)" class="text-slate-300 ml-2">×</button>
-                                </div>
-                                <button @click="stocks.push({id:Date.now(),name:'',code:'',shares:0,price:0})" class="w-full py-2 bg-slate-50 text-[10px] font-bold text-blue-500 rounded-xl mt-1">+ 加持仓</button>
-                            </div>
-                            <!-- 定存 -->
-                            <div class="bg-white p-4 rounded-[20px] shadow-sm">
-                                <h4 class="text-[10px] font-bold text-slate-400 uppercase mb-3 flex justify-between">定期存款 <span class="text-indigo-500">¥{{formatNumber(depositTotal)}}</span></h4>
-                                <div v-for="(d,i) in deposits" :key="i" class="flex justify-between items-center mb-2 text-sm"><input v-model="d.bank" class="font-bold w-1/3 input-clean" placeholder="银行"><div class="flex items-center gap-2"><input v-model.number="d.amount" class="text-right font-bold text-indigo-500 input-clean w-20" placeholder="0"><button @click="deposits.splice(i,1)" class="text-slate-300">×</button></div></div>
-                                <button @click="deposits.push({name:'定存',bank:'',amount:0,date:'',term:''})" class="w-full py-2 bg-slate-50 text-[10px] font-bold text-blue-500 rounded-xl">+ 加存单</button>
-                            </div>
-                            <!-- 贷款 -->
-                            <div class="bg-white p-4 rounded-[20px] shadow-sm">
-                                <h4 class="text-[10px] font-bold text-slate-400 uppercase mb-3 flex justify-between">房贷贷款 <span class="text-emerald-500">-¥{{formatNumber(loanTotal)}}</span></h4>
-                                <div v-for="(l,i) in loans" :key="i" class="mb-3 pb-2 border-b border-slate-50 last:border-0 last:pb-0">
-                                    <div class="flex justify-between mb-1"><input v-model="l.name" class="font-bold text-sm input-clean" placeholder="贷款名称"><button @click="loans.splice(i,1)" class="text-slate-300 text-xs">×</button></div>
-                                    <div class="flex gap-2 text-xs">
-                                        <div class="flex-1 bg-slate-50 p-2 rounded-lg flex justify-between"><span>剩</span><input v-model.number="l.total" class="bg-transparent text-right font-bold w-20 outline-none text-slate-700"></div>
-                                        <div class="w-24 bg-emerald-50 p-2 rounded-lg flex justify-between"><span>供</span><input v-model.number="l.monthlyPayment" class="bg-transparent text-right font-bold w-12 outline-none text-emerald-600"></div>
-                                    </div>
-                                </div>
-                                <button @click="loans.push({id:Date.now(),name:'',total:0,years:30,monthlyPayment:0})" class="w-full py-2 bg-slate-50 text-[10px] font-bold text-blue-500 rounded-xl mt-1">+ 加贷款</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 搜索与流水 -->
-                <div class="pt-2 pb-6">
-                    <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 mb-4 sticky top-0 z-10">
-                        <span class="text-lg">🔍</span>
-                        <input v-model="searchText" class="w-full text-sm font-medium bg-transparent outline-none placeholder:text-slate-400" placeholder="搜索账单、金额...">
-                    </div>
-                    <div class="space-y-3">
-                        <div v-for="tx in filteredTransactions" :key="tx.id" @click="openTxModal(tx)" 
-                            class="bg-white p-4 rounded-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.02)] border border-slate-50 flex items-center justify-between active:scale-95 transition">
-                            <div class="flex items-center gap-4">
-                                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-sm" :class="getTypeColor(tx.type, true)">{{ tx.icon || '📝' }}</div>
-                                <div>
-                                    <div class="font-bold text-slate-700 text-sm flex items-center gap-2">
-                                        {{ tx.category }}
-                                        <span v-if="tx.project" class="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md font-bold">{{tx.project}}</span>
-                                        <span v-if="tx.type==='adjust'" class="text-[9px] bg-amber-50 text-amber-500 px-1.5 py-0.5 rounded-md font-bold">调仓/净值</span>
-                                    </div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5 font-medium">
-                                        {{ tx.date.slice(5) }} <span v-if="tx.desc" class="text-slate-300">|</span> {{tx.desc}}
-                                        <span v-if="tx.type==='transfer'" class="text-blue-400 block mt-0.5">{{getAccountName(tx.fromId)}} → {{getAccountName(tx.toId)}}</span>
-                                        <span v-else-if="tx.type==='adjust'">{{getAccountName(tx.accountId)}}</span>
-                                        <span v-else>· {{ getAccountName(tx.accountId) }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <span class="font-bold text-base font-mono tracking-tight" :class="getTypeColor(tx.type)">
-                                {{ tx.type==='expense'?'-':(tx.type==='income'?'+':'') }}{{ formatNumber(tx.amount) }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- >>>>>> Tab 2: 报表 (Stats) <<<<<< -->
-            <div v-else-if="currentTab === 'stats'" class="space-y-6 animate-fade-in">
-                <!-- 筛选 -->
-                <div class="flex justify-between items-center bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-                    <h2 class="font-bold text-slate-800 ml-3">分析看板</h2>
-                    <div class="bg-slate-100 p-1 rounded-xl flex">
-                        <button v-for="r in ['week','month','year']" :key="r" @click="statsRange=r; renderStats()" 
-                            :class="statsRange===r ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'"
-                            class="px-4 py-1.5 rounded-lg text-xs font-bold transition capitalize">{{r}}</button>
-                    </div>
-                </div>
-
-                <!-- 图表: 投资趋势 -->
-                <div class="card-ios p-6">
-                    <h3 class="text-xs font-bold text-amber-500 mb-4 uppercase tracking-widest flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500"></span> 投资市值趋势 (Invest)</h3>
-                    <div class="h-48 relative"><canvas id="investChart"></canvas></div>
-                </div>
-
-                <!-- 图表: 收支趋势 -->
-                <div class="card-ios p-6">
-                    <h3 class="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">收支流水 (Cashflow)</h3>
-                    <div class="h-40 relative"><canvas id="trendChart"></canvas></div>
-                </div>
-
-                <!-- 图表: 构成 -->
-                <div class="card-ios p-6">
-                    <h3 class="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">支出构成 (Category)</h3>
-                    <div class="h-56 relative"><canvas id="catChart"></canvas></div>
-                </div>
-            </div>
-
-            <!-- >>>>>> Tab 3: 我的 (Mine) <<<<<< -->
-            <div v-else-if="currentTab === 'mine'" class="space-y-6 animate-fade-in">
-                <div class="bg-slate-900 rounded-[32px] p-8 text-white shadow-2xl shadow-slate-200">
-                    <div class="flex items-center gap-5">
-                        <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-3xl">😎</div>
-                        <div>
-                            <h2 class="text-xl font-bold">我的账户</h2>
-                            <p class="text-xs text-slate-400 mt-1">本地安全存储 · 无云端泄露</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="p-4 border-b border-slate-50 text-xs font-bold text-slate-400 uppercase tracking-widest">Preferences</div>
-                    <div class="p-2">
-                        <div class="flex justify-between items-center p-4 hover:bg-slate-50 rounded-2xl transition">
-                            <span class="text-sm font-bold text-slate-700">月度预算限额</span>
-                            <input v-model.number="settings.monthlyBudget" @change="saveData" type="number" class="text-right text-sm font-bold text-blue-600 bg-transparent outline-none w-24">
-                        </div>
-                        <div class="flex justify-between items-center p-4 hover:bg-slate-50 rounded-2xl transition">
-                            <span class="text-sm font-bold text-slate-700">自定义项目标签</span>
-                            <button @click="manageProjects" class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg">编辑</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="p-4 border-b border-slate-50 text-xs font-bold text-slate-400 uppercase tracking-widest">Data & Security</div>
-                    <div class="p-2 space-y-1">
-                        <button @click="exportToFile" class="w-full p-4 flex items-center gap-3 hover:bg-slate-50 rounded-2xl transition text-left"><span class="text-lg">📤</span><span class="text-sm font-bold text-slate-600">备份所有数据 (iCloud)</span></button>
-                        <button @click="exportToExcel" class="w-full p-4 flex items-center gap-3 hover:bg-slate-50 rounded-2xl transition text-left"><span class="text-lg">📊</span><span class="text-sm font-bold text-slate-600">导出 Excel 报表</span></button>
-                        <button @click="resetApp" class="w-full p-4 flex items-center gap-3 hover:bg-red-50 rounded-2xl transition text-left group"><span class="text-lg">🗑️</span><span class="text-sm font-bold text-red-400 group-hover:text-red-500">清空并重置 App</span></button>
-                    </div>
-                </div>
-            </div>
-
-        </main>
-
-        <!-- 底部导航 (Pro级玻璃态) -->
-        <nav class="bg-white/85 backdrop-blur-xl border-t border-slate-200/50 flex justify-around items-center h-24 safe-pb fixed bottom-0 w-full z-40">
-            <button @click="currentTab='home'" :class="currentTab==='home'?'text-slate-900':'text-slate-400'" class="flex flex-col items-center gap-1 w-20 transition active:scale-90"><span class="text-2xl" :class="currentTab==='home'?'scale-110':''">🏠</span><span class="text-[10px] font-bold">明细</span></button>
-            <div class="relative -top-8"><button @click="openTxModal(null)" class="w-16 h-16 rounded-[24px] bg-slate-900 text-white shadow-2xl nav-fab-shadow flex items-center justify-center text-3xl border-4 border-[#F2F4F7] active:scale-90 transition hover:-translate-y-1 duration-300">＋</button></div>
-            <button @click="currentTab='stats'; nextTick(()=>renderStats())" :class="currentTab==='stats'?'text-slate-900':'text-slate-400'" class="flex flex-col items-center gap-1 w-20 transition active:scale-90"><span class="text-2xl" :class="currentTab==='stats'?'scale-110':''">📊</span><span class="text-[10px] font-bold">报表</span></button>
-            <button @click="currentTab='mine'" :class="currentTab==='mine'?'text-slate-900':'text-slate-400'" class="flex flex-col items-center gap-1 w-20 transition active:scale-90"><span class="text-2xl" :class="currentTab==='mine'?'scale-110':''">👤</span><span class="text-[10px] font-bold">我的</span></button>
-        </nav>
-
-        <!-- 全屏记账弹窗 (Modal) -->
-        <transition name="slide-up">
-        <div v-if="showTxModal" class="fixed inset-0 z-50 bg-[#F2F4F7] flex flex-col pt-safe safe-pb">
-            <!-- Modal Header -->
-            <div class="px-6 py-4 flex justify-between items-center bg-transparent">
-                <button @click="showTxModal=false" class="text-slate-400 font-bold text-sm bg-white px-4 py-2 rounded-full shadow-sm active:scale-95 transition">取消</button>
-                <div class="flex bg-white p-1 rounded-full shadow-sm">
-                    <button v-for="t in ['expense','income','transfer','adjust']" :key="t" @click="setTxType(t)" 
-                        :class="newTx.type===t ? 'bg-slate-900 text-white' : 'text-slate-400'"
-                        class="px-3 py-2 rounded-full text-xs font-bold transition capitalize">
-                        {{t==='expense'?'支出':(t==='income'?'收入':(t==='transfer'?'转账':'调价'))}}
-                    </button>
-                </div>
-                <button @click="confirmTx" class="text-white bg-blue-600 font-bold text-sm px-5 py-2 rounded-full shadow-lg active:scale-95 transition">保存</button>
-            </div>
-            
-            <!-- Amount Display (Dynamic) -->
-            <div class="py-6 text-center">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{{newTx.type==='adjust'?'New Price':'Amount'}}</div>
-                <div class="flex justify-center items-end gap-1">
-                    <span class="text-4xl font-bold mb-2 text-slate-300">¥</span>
-                    <input type="number" v-model.number="newTx.amount" class="text-7xl font-black text-center outline-none w-72 bg-transparent text-slate-800 placeholder:text-slate-200" placeholder="0" autofocus>
-                </div>
-                <p v-if="newTx.type==='adjust' && selectedStock" class="text-xs text-amber-500 font-bold mt-2">当前持仓: {{selectedStock.shares}}股 @ ¥{{selectedStock.price}}</p>
-            </div>
-
-            <div class="flex-1 overflow-y-auto px-6 space-y-6 pb-32">
-                
-                <!-- 1. 账户选择器 -->
-                <div>
-                    <p class="text-xs font-bold text-slate-400 uppercase mb-3 ml-2">Account 账户</p>
-                    <div class="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                        <!-- 调价模式：只显示股票 -->
-                        <template v-if="newTx.type === 'adjust'">
-                            <button v-for="s in stocks" :key="s.id" @click="newTx.accountId=s.id" :class="newTx.accountId===s.id?'bg-slate-800 text-white ring-4 ring-slate-200':'bg-white text-slate-600 shadow-sm'" class="px-5 py-3 rounded-2xl text-sm font-bold whitespace-nowrap transition">📈 {{s.name}}</button>
-                        </template>
-                        <!-- 正常模式：全账户 (转账时显示From/To) -->
-                        <template v-else-if="newTx.type === 'transfer'">
-                             <div class="w-full bg-white p-4 rounded-3xl flex items-center justify-between shadow-sm">
-                                <div class="w-[45%]">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase block mb-2">From</label>
-                                    <select v-model="newTx.fromId" class="w-full bg-slate-50 p-3 rounded-2xl text-sm font-bold appearance-none outline-none"><option value="cash">👛 现金</option><option value="debit">💳 储蓄卡</option></select>
-                                </div>
-                                <div class="text-slate-300">➔</div>
-                                <div class="w-[45%]">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase block mb-2">To</label>
-                                    <select v-model="newTx.toId" class="w-full bg-slate-50 p-3 rounded-2xl text-sm font-bold appearance-none outline-none"><option value="cash">👛 现金</option><option value="debit">💳 储蓄卡</option><option v-for="c in creditCards" :value="c.id">💳 {{c.name}}</option><option v-for="s in stocks" :value="s.id">📈 {{s.name}}</option></select>
-                                </div>
-                            </div>
-                        </template>
-                        <template v-else>
-                            <button @click="newTx.accountId='cash'" :class="newTx.accountId==='cash'?'bg-slate-800 text-white ring-4 ring-slate-200':'bg-white text-slate-600 shadow-sm'" class="px-5 py-3 rounded-2xl text-sm font-bold whitespace-nowrap transition">👛 现金</button>
-                            <button @click="newTx.accountId='debit'" :class="newTx.accountId==='debit'?'bg-slate-800 text-white ring-4 ring-slate-200':'bg-white text-slate-600 shadow-sm'" class="px-5 py-3 rounded-2xl text-sm font-bold whitespace-nowrap transition">💳 储蓄卡</button>
-                            <button v-for="c in creditCards" :key="c.id" @click="newTx.accountId=c.id" :class="newTx.accountId===c.id?'bg-slate-800 text-white ring-4 ring-slate-200':'bg-white text-slate-600 shadow-sm'" class="px-5 py-3 rounded-2xl text-sm font-bold whitespace-nowrap transition">💳 {{c.name}}</button>
-                            <button v-for="s in stocks" :key="s.id" @click="newTx.accountId=s.id" :class="newTx.accountId===s.id?'bg-slate-800 text-white ring-4 ring-slate-200':'bg-white text-slate-600 shadow-sm'" class="px-5 py-3 rounded-2xl text-sm font-bold whitespace-nowrap transition">📈 {{s.name}}</button>
-                        </template>
-                    </div>
-                </div>
-
-                <!-- 2. 股票交易补充信息 (仅当账户涉及股票时出现) -->
-                <div v-if="isStockTransaction && newTx.type !== 'adjust'" class="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                    <p class="text-xs font-bold text-amber-500 uppercase mb-2">股票成交详情</p>
-                    <div class="flex gap-3">
-                        <div class="w-1/2"><label class="text-[10px] text-amber-400 font-bold block mb-1">成交单价</label><input type="number" v-model.number="newTx.stockPrice" class="w-full bg-white p-2 rounded-xl text-sm font-bold outline-none" placeholder="单价"></div>
-                        <div class="w-1/2"><label class="text-[10px] text-amber-400 font-bold block mb-1">成交股数</label><input type="number" v-model.number="newTx.stockShares" class="w-full bg-white p-2 rounded-xl text-sm font-bold outline-none" placeholder="股数"></div>
-                    </div>
-                </div>
-
-                <!-- 3. 分类 (收支模式) -->
-                <div v-if="['expense','income', 'adjust'].includes(newTx.type)">
-                    <p class="text-xs font-bold text-slate-400 uppercase mb-3 ml-2">Category 分类</p>
-                    <div class="grid grid-cols-5 gap-4">
-                        <div v-for="cat in currentCategories" :key="cat.name" @click="newTx.category=cat.name; newTx.icon=cat.icon" class="flex flex-col items-center gap-2 transition active:scale-90 cursor-pointer" :class="{'opacity-100': newTx.category===cat.name, 'opacity-40 grayscale': newTx.category!==cat.name}">
-                            <div class="w-14 h-14 rounded-[20px] flex items-center justify-center text-2xl shadow-sm transition duration-300" :class="newTx.category===cat.name?'bg-white border-2 border-slate-800 shadow-lg':'bg-white border border-slate-100'">{{cat.icon}}</div>
-                            <span class="text-[10px] font-bold text-slate-600">{{cat.name}}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. 详细信息 -->
-                <div class="space-y-4">
-                    <div class="flex gap-3">
-                        <div class="w-1/2 bg-white p-3 rounded-2xl shadow-sm"><label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Date</label><input type="date" v-model="newTx.date" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none"></div>
-                        <div class="w-1/2 bg-white p-3 rounded-2xl shadow-sm flex items-center justify-between px-3">
-                             <div class="w-full">
-                                <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Project</label>
-                                <select v-model="newTx.project" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none"><option value="">无项目</option><option v-for="p in settings.projects" :value="p">{{p}}</option></select>
-                             </div>
-                             <button @click="addProject" class="text-blue-500 font-bold text-lg ml-1 leading-none" title="添加项目">+</button>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-2xl shadow-sm"><input type="text" v-model="newTx.desc" class="w-full bg-transparent font-bold text-slate-700 text-sm outline-none placeholder:text-slate-300" placeholder="添加备注 (可选)..."></div>
-                </div>
-
-                <div v-if="editingTx" class="pt-4"><button @click="deleteTx" class="w-full py-4 bg-red-50 text-red-500 font-bold rounded-2xl text-sm border border-red-100 hover:bg-red-100 transition">🗑️ 删除此记录</button></div>
-            </div>
-        </div>
-        </transition>
-
-    </div>
 </div>
 
 <script>
-    const { createApp, nextTick } = Vue;
+    const { createApp, ref, computed, onMounted, reactive } = Vue;
+    const Decimal = decimal.Decimal; // 引入金融计算库
 
-    createApp({
-        data() {
-            return {
-                isUnlocked: false, hasLocalData: false, showImport: false, showTxModal: false,
-                passwordInput: '', masterKey: '', encryptedString: '', importString: '',
-                currentTab: 'home', searchText: '',
-                
-                assets: { cash: 0, debit: 0 },
-                deposits: [], stocks: [], loans: [], creditCards: [], 
-                transactions: [], history: [], 
-                settings: { monthlyBudget: 5000, projects: ['装修','旅游','人情','宠物','汽车','医疗','教育','大件'] },
-                
-                newTx: { type: 'expense', amount: '', category: '餐饮', icon: '🍔', desc: '', accountId: 'cash', fromId:'cash', toId:'debit', date: new Date().toISOString().slice(0,10), project: '', stockPrice:'', stockShares:'' },
-                editingTx: null,
-                ui: { cashOpen: false, creditOpen: true, investOpen: false, loanOpen: false },
-                
-                categories: {
-                    expense: [
-                        {name:'餐饮',icon:'🍔'},{name:'购物',icon:'🛍️'},{name:'交通',icon:'🚗'},{name:'住房',icon:'🏠'},
-                        {name:'娱乐',icon:'🎮'},{name:'医疗',icon:'💊'},{name:'教育',icon:'🎓'},{name:'宠物',icon:'🐾'},
-                        {name:'美妆',icon:'💄'},{name:'运动',icon:'🏃'},{name:'社交',icon:'🥂'},{name:'旅游',icon:'✈️'},
-                        {name:'数码',icon:'📱'},{name:'通讯',icon:'📞'},{name:'投资',icon:'📉'},{name:'其他',icon:'📝'}
-                    ],
-                    income: [
-                        {name:'工资',icon:'💰'},{name:'理财',icon:'📈'},{name:'兼职',icon:'💼'},{name:'礼金',icon:'🧧'},
-                        {name:'奖金',icon:'🏅'},{name:'报销',icon:'🧾'},{name:'其他',icon:'💎'}
-                    ]
-                },
-                statsRange: 'month', statsData: { income:0, expense:0, projectStats:[] }, 
-                trendChart: null, catChart: null, investChart: null
-            }
-        },
-        computed: {
-            currentDate() { return new Date().toLocaleDateString(); },
-            cashTotal() { return (this.assets.cash||0) + (this.assets.debit||0); },
-            depositTotal() { return this.deposits.reduce((s,i)=>s+(i.amount||0),0); },
-            stockTotal() { return this.stocks.reduce((s,i)=>s+((i.shares||0)*(i.price||0)),0); },
-            creditTotal() { return this.creditCards.reduce((sum, c) => sum + (c.lastMonthBill||0) + (c.currentMonthBill||0) + (c.installments||[]).reduce((is,i)=>is+(i.total-(i.monthlyAmount*(i.paidMonths||0))),0), 0); },
-            loanTotal() { return this.loans.reduce((s,i)=>s+(i.total||0),0); },
-            totalAssets() { return this.cashTotal + this.depositTotal + this.stockTotal; },
-            totalLiabilities() { return this.creditTotal + this.loanTotal; },
-            netWorth() { return this.totalAssets - this.totalLiabilities; },
+    // --- 1. 本地数据库初始化 (Dexie.js) ---
+    // 数据存储在手机本地 IndexedDB，绝对安全保密
+    const db = new Dexie("iCostReplicaDB_V2");
+    db.version(1).stores({
+        // accountType: 'asset' | 'liability' | 'investment'
+        accounts: "++id, name, type, balance, quantity", 
+        // type: 'expense' | 'income' | 'transfer'
+        transactions: "++id, date, type, amount, sourceAccountId, targetAccountId, category, quantityChange"
+    });
+
+    const app = createApp({
+        setup() {
+            // --- 状态管理 ---
+            const currentTab = ref('timeline');
+            const showRecordModal = ref(false);
+            const allAccounts = ref([]);
+            const recentTransactions = ref([]);
             
-            monthlyStats() {
-                const cm = new Date().toISOString().slice(0,7);
-                const income = this.transactions.filter(t=>t.type==='income' && t.date.startsWith(cm)).reduce((s,t)=>s+t.amount,0);
-                let expense = this.transactions.filter(t=>t.type==='expense' && t.date.startsWith(cm)).reduce((s,t)=>s+t.amount,0);
-                this.loans.forEach(l => expense += (l.monthlyPayment||0));
-                this.creditCards.forEach(c => (c.installments||[]).forEach(i => expense += (i.monthlyAmount||0)));
-                return { income, expense };
-            },
-            budgetProgress() { return (this.monthlyStats.expense / (this.settings.monthlyBudget || 1)) * 100; },
-            currentCategories() { return this.newTx.type === 'expense' ? this.categories.expense : this.categories.income; },
-            
-            isStockTransaction() {
-                if(this.newTx.type === 'transfer') return this.stocks.find(s=>s.id===this.newTx.fromId) || this.stocks.find(s=>s.id===this.newTx.toId);
-                return false; 
-            },
-            selectedStock() { return this.newTx.type==='adjust' ? this.stocks.find(s=>s.id===this.newTx.accountId) : null; },
-            
-            filteredTransactions() {
-                let txs = [...this.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
-                if(this.searchText) {
-                    const low = this.searchText.toLowerCase();
-                    txs = txs.filter(t => (t.desc&&t.desc.toLowerCase().includes(low)) || t.amount.toString().includes(low) || (t.project&&t.project.includes(low)));
-                }
-                return txs.slice(0, 50);
-            }
-        },
-        mounted() {
-            if(localStorage.getItem('myWealth_V16_FINAL')) this.hasLocalData = true;
-        },
-        methods: {
-            unlock() {
-                if(!this.passwordInput) return;
-                this.masterKey = this.passwordInput;
-                const local = localStorage.getItem('myWealth_V16_FINAL');
-                if(local) { if(!this.decryptAndLoad(local)) alert("密码错误"); } else { this.isUnlocked = true; this.saveData(); }
-            },
-            decryptAndLoad(str) {
-                try {
-                    const bytes = CryptoJS.AES.decrypt(str, this.masterKey);
-                    const data = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-                    Object.assign(this, data);
-                    if(!this.settings) this.settings = { monthlyBudget: 5000, projects: ['装修'] };
-                    this.isUnlocked = true;
-                    return true;
-                } catch(e) { return false; }
-            },
-            
-            // === 核心逻辑 ===
-            setTxType(t) {
-                this.newTx.type = t;
-                if (t === 'adjust') {
-                    this.newTx.category = '理财';
-                    this.newTx.icon = '📈';
-                } else if (t === 'expense' && this.newTx.category === '理财') {
-                    this.newTx.category = '餐饮'; // reset to default expense if switching back
-                    this.newTx.icon = '🍔';
-                }
-            },
-            openTxModal(tx) { 
-                this.editingTx = tx;
-                this.newTx = tx ? JSON.parse(JSON.stringify(tx)) : { 
-                    type: 'expense', amount: '', category: '餐饮', icon: '🍔', desc: '', 
-                    accountId: 'cash', fromId: 'cash', toId: 'debit',
-                    date: new Date().toISOString().slice(0,10), project: '', stockPrice:'', stockShares:'' 
-                };
-                this.showTxModal = true; 
-            },
-            updateAccount(tx, revert=false) {
-                const f = revert ? -1 : 1;
-                const {type, amount, accountId, fromId, toId, stockShares, stockPrice} = tx;
-                
-                if (type === 'adjust') {
-                    const st = this.stocks.find(s=>s.id === accountId);
-                    if (st) st.price = amount; 
-                    return; 
-                }
-                if (type === 'transfer') {
-                    this.modifyBalance(fromId, -amount * f);
-                    this.modifyBalance(toId, amount * f);
-                    const toStock = this.stocks.find(s=>s.id === toId);
-                    const fromStock = this.stocks.find(s=>s.id === fromId);
-                    if (toStock && stockShares) toStock.shares += stockShares * f; 
-                    if (fromStock && stockShares) fromStock.shares -= stockShares * f;
-                } else {
-                    if(['cash','debit'].includes(accountId)) {
-                        this.modifyBalance(accountId, (type==='income'?amount:-amount)*f);
-                    } else {
-                        let cc=this.creditCards.find(c=>c.id===accountId), ln=this.loans.find(l=>l.id===accountId);
-                        if(cc) cc.currentMonthBill += (type==='expense'?amount:-amount)*f; 
-                        else if(ln) ln.total += (type==='income'?-amount:amount)*f;
-                    }
-                }
-            },
-            modifyBalance(id, delta) {
-                if(id==='cash') this.assets.cash += delta;
-                else if(id==='debit') this.assets.debit += delta;
-                else {
-                    let cc=this.creditCards.find(c=>c.id===id);
-                    if(cc) cc.currentMonthBill -= delta; 
-                }
-            },
-            confirmTx() {
-                if(!this.newTx.amount) return;
-                if(this.editingTx) { this.updateAccount(this.editingTx, true); this.transactions = this.transactions.filter(t=>t.id!==this.editingTx.id); }
-                const final = { id: this.editingTx?.id||Date.now(), ...this.newTx };
-                this.updateAccount(final);
-                this.transactions.push(final);
-                this.showTxModal = false;
-                this.saveData();
-            },
-            deleteTx() {
-                if(!confirm("确定删除？")) return;
-                this.updateAccount(this.editingTx, true);
-                this.transactions = this.transactions.filter(t=>t.id!==this.editingTx.id);
-                this.showTxModal = false;
-                this.saveData();
-            },
-            addProject() {
-                const p = prompt("请输入新项目名称:");
-                if(p && !this.settings.projects.includes(p)) {
-                    this.settings.projects.push(p);
-                    this.newTx.project = p;
-                    this.saveData();
-                }
-            },
+            // 记账表单状态
+            const keypadValue = ref('');
+            const recordForm = reactive({
+                type: 'expense',
+                sourceAccountId: null,
+                targetAccountId: null,
+                category: '一般',
+                quantityChange: null, // 用于投资
+            });
 
-            // === 报表渲染 ===
-            renderStats() {
-                const ctxTrend = document.getElementById('trendChart');
-                const ctxCat = document.getElementById('catChart');
-                const ctxInvest = document.getElementById('investChart');
-                if(!ctxTrend || !ctxCat || !ctxInvest) return;
-                if(this.trendChart) this.trendChart.destroy();
-                if(this.catChart) this.catChart.destroy();
-                if(this.investChart) this.investChart.destroy();
+            // --- 2. 核心逻辑 (CPA 重点关注) ---
 
-                const now = new Date();
-                let startStr = "";
-                if(this.statsRange==='week') { const d=new Date(); d.setDate(d.getDate()-7); startStr=d.toISOString().slice(0,10); }
-                else if(this.statsRange==='month') { startStr=now.toISOString().slice(0,7); }
-                else { startStr=now.toISOString().slice(0,4); }
+            // 初始化数据加载
+            const loadData = async () => {
+                allAccounts.value = await db.accounts.toArray();
+                recentTransactions.value = (await db.transactions.orderBy('date').reverse().limit(50).toArray());
 
-                const txs = this.transactions.filter(t => t.date >= startStr && t.type!=='transfer' && t.type!=='adjust');
-                this.statsData.income = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-                this.statsData.expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-
-                const projMap = {};
-                txs.filter(t=>t.type==='expense' && t.project).forEach(t => projMap[t.project] = (projMap[t.project]||0)+t.amount);
-                this.statsData.projectStats = Object.entries(projMap).sort((a,b)=>b[1]-a[1]).map(([name, amount])=>({name, amount, percent: Math.round(amount/this.statsData.expense*100)}));
-
-                const catMap = {};
-                txs.filter(t=>t.type==='expense').forEach(t => catMap[t.category] = (catMap[t.category]||0)+t.amount);
-                const cats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-                
-                this.catChart = new Chart(ctxCat, {
-                    type: 'doughnut',
-                    data: { labels: cats.map(x=>x[0]), datasets: [{ data: cats.map(x=>x[1]), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'], borderWidth: 0 }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
-                });
-
-                const days = {};
-                txs.forEach(t => { const d=t.date.slice(5); if(!days[d]) days[d]={in:0,out:0}; if(t.type==='income') days[d].in+=t.amount; else days[d].out+=t.amount; });
-                const labels = Object.keys(days).sort();
-                this.trendChart = new Chart(ctxTrend, {
-                    type: 'bar',
-                    data: { labels, datasets: [ { label:'支', data: labels.map(d=>days[d].out), backgroundColor:'#10b981', borderRadius:3 }, { label:'收', data: labels.map(d=>days[d].in), backgroundColor:'#ef4444', borderRadius:3 } ] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{display:false}} }
-                });
-                
-                const investLabels = this.history.slice(-30).map(h => h.date.slice(5));
-                const investData = this.history.slice(-30).map(h => h.stockVal || 0);
-                this.investChart = new Chart(ctxInvest, {
-                    type: 'line',
-                    data: { labels: investLabels, datasets: [{ label: '市值', data: investData, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-                });
-            },
-
-            manageProjects() {
-                const input = prompt("当前项目列表 (用逗号分隔):", this.settings.projects.join(','));
-                if(input !== null) { this.settings.projects = input.split(',').map(s=>s.trim()).filter(s=>s); this.saveData(); }
-            },
-            addCreditCard() { this.creditCards.push({id:Date.now(), name:'', lastMonthBill:0, currentMonthBill:0, installments:[]}); },
-            addInstallment(card) {
-                const name=prompt("分期事项名称 (如: iPhone)"), total=Number(prompt("分期总金额")), months=Number(prompt("分期期数"));
-                if(name&&total&&months) card.installments.push({name, total, months, monthlyAmount:total/months, paidMonths:0});
-            },
-            removeCreditCard(idx) { if(confirm("删除此卡？")) this.creditCards.splice(idx,1); },
-            calcLoanMonthly(l) { if(l.total && l.years) l.monthlyPayment = Math.round(l.total / (l.years * 12)); },
-            getAccountName(id) {
-                if(id==='cash') return '现金'; if(id==='debit') return '储蓄卡';
-                return (this.creditCards.concat(this.stocks, this.loans).find(x=>x.id===id)||{}).name || '未知';
-            },
-            getTypeColor(type, bg=false) {
-                if(type==='income') return bg ? 'bg-red-50 text-red-500' : 'text-income';
-                if(type==='transfer') return bg ? 'bg-blue-50 text-blue-500' : 'text-transfer';
-                if(type==='adjust') return bg ? 'bg-amber-50 text-amber-500' : 'text-adjust';
-                return bg ? 'bg-emerald-50 text-emerald-500' : 'text-expense';
-            },
-            toggleAll() { this.ui.cashOpen=!this.ui.cashOpen; this.ui.creditOpen=this.ui.cashOpen; this.ui.investOpen=this.ui.cashOpen; this.ui.loanOpen=this.ui.cashOpen; },
-            
-            saveData() {
-                const today = new Date().toLocaleDateString();
-                const currentStockVal = this.stockTotal;
-                if(!this.history.find(h=>h.date===today)) { 
-                    this.history.push({date:today, val:this.netWorth, stockVal: currentStockVal}); 
-                    if(this.history.length>30) this.history.shift(); 
-                } else { 
-                    const h = this.history.find(h=>h.date===today);
-                    h.val = this.netWorth;
-                    h.stockVal = currentStockVal;
+                // 首次运行：预设一些账户 (解决痛点1：不能随意添加)
+                if (allAccounts.value.length === 0) {
+                    await db.accounts.bulkAdd([
+                        { name: "招商储蓄卡", type: 'asset', balance: 10000.00, quantity: 0 },
+                        { name: "微信零钱", type: 'asset', balance: 500.50, quantity: 0 },
+                        // 负债账户：余额通常为负数，表示欠款
+                        { name: "招行信用卡", type: 'liability', balance: -2500.00, quantity: 0 },
+                        { name: "蚂蚁花呗", type: 'liability', balance: -800.00, quantity: 0 },
+                        // 投资账户：支持记录份额 (解决痛点3)
+                        { name: "华夏基金", type: 'investment', balance: 5000.00, quantity: 2500.00 }
+                    ]);
+                    await loadData();
+                    // 设置默认选中项
+                    recordForm.sourceAccountId = assetAccounts.value[0]?.id;
                 }
-                const data = { assets:this.assets, deposits:this.deposits, stocks:this.stocks, loans:this.loans, creditCards:this.creditCards, transactions:this.transactions, history:this.history, settings:this.settings };
-                const str = CryptoJS.AES.encrypt(JSON.stringify(data), this.masterKey).toString();
-                localStorage.setItem('myWealth_V16_FINAL', str);
-                if(this.isUnlocked && this.currentTab==='stats') this.renderStats();
-            },
-            
-            exportToFile() {
-                const data = localStorage.getItem('myWealth_V16_FINAL');
-                const blob = new Blob([data], { type: 'text/plain' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wealth_backup_${new Date().toISOString().slice(0,10)}.txt`; a.click();
-            },
-            handleFileImport(event) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
+            };
+
+            // 键盘输入处理 (支持简单计算)
+            const handleKeypadPress = (key) => {
+                if (key === 'OK') {
+                    submitTransaction();
+                } else if (key === 'Del') {
+                    keypadValue.value = keypadValue.value.toString().slice(0, -1);
+                } else if (['+','-'].includes(key)) {
+                    // 简单实现：如果输入了运算符，先计算当前结果，再等待下一个数字
+                    // 实际 iCost 逻辑更复杂，这里为演示简化处理
                     try {
-                        const bytes = CryptoJS.AES.decrypt(e.target.result, this.masterKey);
-                        JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-                        localStorage.setItem('myWealth_V16_FINAL', e.target.result);
-                        alert("恢复成功！刷新页面生效。");
-                        location.reload();
-                    } catch(err) { alert("文件无效或密码不匹配"); }
+                         // 使用 eval 前进行严格校验，防止安全问题。这里仅允许数字和加减点
+                        if (/^[\d.+\-]+$/.test(keypadValue.value)) {
+                            // 使用 Decimal 进行计算以保证精度
+                             const parts = keypadValue.value.split(/([+\-])/);
+                             let result = new Decimal(parts[0] || 0);
+                             for(let i=1; i<parts.length; i+=2) {
+                                 const op = parts[i];
+                                 const val = new Decimal(parts[i+1] || 0);
+                                 if(op === '+') result = result.plus(val);
+                                 if(op === '-') result = result.minus(val);
+                             }
+                             keypadValue.value = result.toString();
+                        }
+                    } catch (e) { keypadValue.value = 'Error'; }
+                } else {
+                    // 防止多个小数点
+                    if (key === '.' && keypadValue.value.includes('.')) return;
+                    // 限制小数位 (解决痛点2：无限小数在输入端的控制)
+                    if (keypadValue.value.includes('.') && keypadValue.value.split('.')[1].length >= 2) return;
+                    keypadValue.value += key;
+                }
+            };
+
+            // --- 核心提交逻辑 (解决所有痛点的关键) ---
+            const submitTransaction = async () => {
+                // 使用 Decimal 处理金额，杜绝浮点误差 (解决痛点2)
+                const amount = new Decimal(keypadValue.value || 0);
+                if (amount.isZero() || amount.isNegative()) {
+                    alert("请输入有效金额"); return;
+                }
+
+                const txData = {
+                    date: new Date(),
+                    type: recordForm.type,
+                    amount: amount.toNumber(), // 存入数据库时转为 Number，但计算过程全是 Decimal
+                    category: recordForm.category,
+                    sourceAccountId: recordForm.sourceAccountId,
+                    targetAccountId: recordForm.targetAccountId,
+                    quantityChange: recordForm.quantityChange ? parseFloat(recordForm.quantityChange) : null
                 };
-                reader.readAsText(event.target.files[0]);
-            },
-            importData() {
-                try {
-                    const bytes = CryptoJS.AES.decrypt(this.importString, this.masterKey);
-                    const data = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-                    Object.assign(this, data);
-                    this.saveData();
-                    this.showImport = false;
-                    alert("恢复成功");
-                } catch(e){ alert('恢复失败'); }
-            },
-            exportToExcel() {
-                let csv = "\uFEFF日期,类型,金额,分类,项目,账户,备注\n";
-                this.transactions.forEach(t => csv += `${t.date},${t.type==='income'?'收入':(t.type==='transfer'?'转账':(t.type==='adjust'?'调仓':'支出'))},${t.amount},${t.category||'-'},${t.project||'-'},${this.getAccountName(t.accountId)},${t.desc}\n`);
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-                link.download = `账单_${new Date().toLocaleDateString()}.csv`;
-                link.click();
-            },
-            resetApp() { if(confirm("⚠️ 确定重置？数据将永久丢失！")) { localStorage.removeItem('myWealth_V16_FINAL'); location.reload(); } },
-            lockApp() { this.saveData(); this.isUnlocked = false; this.passwordInput = ''; },
-            formatNumber(num) { return num ? num.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '0.00'; }
+
+                // ACID 事务：确保流水记录和账户余额同时更新成功，否则回滚
+                await db.transaction('rw', db.accounts, db.transactions, async () => {
+                    // 1. 写入流水
+                    await db.transactions.add(txData);
+
+                    // 2. 更新账户余额 (CPA 借贷逻辑)
+                    if (recordForm.type === 'expense') {
+                        // 支出：资产减少
+                        const acc = await db.accounts.get(recordForm.sourceAccountId);
+                        const newBalance = new Decimal(acc.balance).minus(amount);
+                        await db.accounts.update(acc.id, { balance: newBalance.toNumber() });
+                    } 
+                    else if (recordForm.type === 'income') {
+                         // 收入：资产增加
+                        const acc = await db.accounts.get(recordForm.sourceAccountId);
+                        const newBalance = new Decimal(acc.balance).plus(amount);
+                        await db.accounts.update(acc.id, { balance: newBalance.toNumber() });
+                    }
+                    else if (recordForm.type === 'transfer') {
+                        // 转账/还款 (解决痛点2的核心)：Source 减少，Target 增加
+                        // 例：储蓄卡(1万) 转 2500 到 信用卡(-2500)。
+                        // 储蓄卡变 7500，信用卡变 0。完美平账。
+                        if (!recordForm.sourceAccountId || !recordForm.targetAccountId) { throw new Error("请选择转入转出账户"); }
+                        
+                        const source = await db.accounts.get(recordForm.sourceAccountId);
+                        const target = await db.accounts.get(recordForm.targetAccountId);
+
+                        const newSourceBal = new Decimal(source.balance).minus(amount);
+                        const newTargetBal = new Decimal(target.balance).plus(amount);
+
+                        await db.accounts.update(source.id, { balance: newSourceBal.toNumber() });
+                        await db.accounts.update(target.id, { balance: newTargetBal.toNumber() });
+                    }
+
+                    // 3. 更新投资数量 (解决痛点3)
+                    if (isInvestmentTransaction.value && recordForm.quantityChange) {
+                         // 假设是对 source 账户进行份额变更
+                         const acc = await db.accounts.get(recordForm.sourceAccountId);
+                         // 使用 Decimal 确保份额计算也精确
+                         const newQuantity = new Decimal(acc.quantity || 0).plus(new Decimal(recordForm.quantityChange));
+                         await db.accounts.update(acc.id, { quantity: newQuantity.toNumber() });
+                    }
+                });
+
+                // 重置界面
+                closeModal();
+                await loadData();
+            };
+
+            // --- UI 辅助函数与计算属性 ---
+            
+            // 打开记账面板
+            const openRecordModal = () => {
+                keypadValue.value = '';
+                recordForm.category = '一般';
+                // 智能设置默认账户
+                if (recordForm.type === 'transfer' && assetAccounts.value.length > 0 && liabilityAccounts.value.length > 0) {
+                    recordForm.sourceAccountId = assetAccounts.value[0].id;
+                    recordForm.targetAccountId = liabilityAccounts.value[0].id;
+                }
+                showRecordModal.value = true;
+            };
+
+            const closeModal = () => {
+                 showRecordModal.value = false;
+            }
+            
+            // 添加新账户 (解决痛点1)
+            const addNewAccount = async (type) => {
+                const name = prompt("请输入账户名称 (例如: 交通银行信用卡)");
+                if (name) {
+                    // 负债账户初始默认给个负数余额示范
+                    const initialBalance = type === 'liability' ? -1000.00 : 0.00;
+                    await db.accounts.add({ name, type, balance: initialBalance, quantity: 0 });
+                    await loadData();
+                }
+            };
+
+            // 计算属性：账户分类
+            const assetAccounts = computed(() => allAccounts.value.filter(a => a.type === 'asset'));
+            const liabilityAccounts = computed(() => allAccounts.value.filter(a => a.type === 'liability'));
+            const investmentAccounts = computed(() => allAccounts.value.filter(a => a.type === 'investment'));
+            
+            // 计算属性：根据记账类型决定可选账户
+            const availableAccountsForType = computed(() => {
+                // 支出/收入允许选择资产和负债账户（比如用信用卡直接消费）
+                return [...assetAccounts.value, ...liabilityAccounts.value];
+            });
+
+             // 判断是否涉及投资账户交易
+            const isInvestmentTransaction = computed(() => {
+                if (!recordForm.sourceAccountId) return false;
+                const acc = allAccounts.value.find(a => a.id === recordForm.sourceAccountId);
+                return acc && acc.type === 'investment';
+            });
+
+            // 计算属性：财务指标
+            // 使用 Decimal.js 进行汇总计算，确保报表无延迟且精准 (解决痛点4)
+            const netWorth = computed(() => {
+                return allAccounts.value.reduce((sum, acc) => sum.plus(new Decimal(acc.balance)), new Decimal(0)).toNumber();
+            });
+
+            // 简单计算本月收支 (实际应用应用日期筛选)
+            const monthlyIncome = computed(() => {
+                 return recentTransactions.value.filter(t => t.type === 'income')
+                    .reduce((sum, t) => sum.plus(new Decimal(t.amount)), new Decimal(0)).toNumber();
+            });
+            const monthlyExpense = computed(() => {
+                 return recentTransactions.value.filter(t => t.type === 'expense')
+                    .reduce((sum, t) => sum.plus(new Decimal(t.amount)), new Decimal(0)).toNumber();
+            });
+            const monthlyBalance = computed(() => new Decimal(monthlyIncome.value).minus(new Decimal(monthlyExpense.value)).toNumber());
+
+            // 格式化工具
+            const formatCurrency = (val) => {
+                 // 强制保留两位小数，解决痛点2的显示问题
+                return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(val);
+            };
+            const formatDate = (date) => new Date(date).toLocaleDateString('zh-CN', {month: 'short', day: 'numeric'});
+            const getCategoryIcon = (cat) => { const map = {'餐饮': '🍔', '交通': '🚗', '购物': '🛍️', '工资': '💰'}; return map[cat] || '🏷️'; };
+            const getAccountName = (id) => allAccounts.value.find(a => a.id === id)?.name || '未知账户';
+            const getAmountColor = (type) => ({'expense': 'text-gray-800', 'income': 'text-green-600', 'transfer': 'text-gray-400'}[type]);
+
+            onMounted(loadData);
+
+            return {
+                currentTab, showRecordModal, allAccounts, recentTransactions, recordForm, keypadValue,
+                assetAccounts, liabilityAccounts, investmentAccounts, availableAccountsForType, isInvestmentTransaction,
+                netWorth, monthlyIncome, monthlyExpense, monthlyBalance,
+                openRecordModal, closeModal, handleKeypadPress, addNewAccount,
+                formatCurrency, formatDate, getCategoryIcon, getAccountName, getAmountColor
+            };
         }
     }).mount('#app');
 </script>
